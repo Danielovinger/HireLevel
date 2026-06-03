@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "HireLevel Capture",
+  "description": "Capture LinkedIn job details into the offline HireLevel board.",
+  "version": "0.1.0",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.linkedin.com/jobs/*",
+    "https://www.linkedin.com/jobs/collections/*",
+    "file:///*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/jobs/*", "https://www.linkedin.com/jobs/collections/*"],
+      "js": ["linkedin-capture.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["file:///*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["board-bridge.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "HireLevel Capture"
+  }
+}

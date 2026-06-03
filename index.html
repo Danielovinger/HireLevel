@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HireLevel</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Workspace navigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">HL</div>
+          <div>
+            <strong>HireLevel</strong>
+            <span>Level up your job search</span>
+          </div>
+        </div>
+        <nav>
+          <a class="active" href="#board">Application Board</a>
+          <a href="#archive">Archive</a>
+          <a href="#settings">Settings</a>
+        </nav>
+        <div class="sidebar-footer">
+          <span id="storageStatus">Saved locally</span>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Private by design</p>
+            <h1>My Job Search</h1>
+          </div>
+          <div class="topbar-actions">
+            <label class="search">
+              <span class="sr-only">Search jobs</span>
+              <input id="searchInput" type="search" placeholder="Search jobs, companies, notes" />
+            </label>
+            <button id="addJobBtn" class="primary-btn" type="button">+ Add Job</button>
+          </div>
+          <aside class="level-panel" aria-label="Application level">
+            <div class="level-row">
+              <strong id="levelText">Level 1</strong>
+              <span id="levelTitle">Jobless Worm I</span>
+            </div>
+            <div class="xp-meter" aria-hidden="true">
+              <span id="xpMeterFill"></span>
+            </div>
+            <div class="level-row meta">
+              <span id="xpProgress">0 / 5 XP</span>
+              <span id="totalXp">0 total XP</span>
+            </div>
+          </aside>
+        </header>
+
+        <section class="toolbar" aria-label="Board actions">
+          <button id="addColumnBtn" class="ghost-btn" type="button">+ Add Column</button>
+          <button id="exportBtn" class="ghost-btn" type="button">Export JSON</button>
+          <label class="import-label">
+            Import JSON
+            <input id="importInput" type="file" accept="application/json" />
+          </label>
+        </section>
+
+        <section id="board" class="board" aria-label="Job application board"></section>
+      </main>
+    </div>
+
+    <dialog id="jobDialog" class="dialog">
+      <form id="jobForm" method="dialog">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Job details</p>
+            <h2 id="jobDialogTitle">Add Job</h2>
+          </div>
+          <button class="icon-btn" type="button" data-close-dialog aria-label="Close dialog">x</button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Job URL
+            <div class="url-row">
+              <input id="jobUrl" name="url" type="url" placeholder="https://company.com/jobs/software-engineer" />
+              <button id="fetchJobBtn" class="secondary-btn" type="button">Fetch</button>
+            </div>
+          </label>
+          <label class="wide">
+            Paste job page text
+            <textarea id="jobPageText" rows="5" placeholder="For LinkedIn or blocked sites, copy the visible job panel text and paste it here"></textarea>
+          </label>
+          <div class="wide paste-tools">
+            <button id="parsePastedTextBtn" class="secondary-btn" type="button">Parse Pasted Text</button>
+          </div>
+          <label>
+            Position name
+            <input id="jobTitle" name="title" type="text" required placeholder="Frontend Engineer" />
+          </label>
+          <label>
+            Company
+            <input id="jobCompany" name="company" type="text" required placeholder="Acme" />
+          </label>
+          <label>
+            Date applied
+            <input id="jobDate" name="dateApplied" type="date" required />
+          </label>
+          <label>
+            Status
+            <select id="jobStatus" name="status"></select>
+          </label>
+          <label class="wide">
+            Description
+            <textarea id="jobDescription" name="description" rows="8" placeholder="Paste or fetch the job description"></textarea>
+          </label>
+          <label class="wide">
+            Notes
+            <textarea id="jobNotes" name="notes" rows="4" placeholder="Interview notes, contacts, salary, reminders"></textarea>
+          </label>
+        </div>
+
+        <p id="fetchMessage" class="fetch-message" role="status"></p>
+
+        <div class="dialog-actions">
+          <button class="ghost-btn" type="button" data-close-dialog>Cancel</button>
+          <button class="primary-btn" type="submit">Save Job</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="columnDialog" class="dialog small-dialog">
+      <form id="columnForm" method="dialog">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Board column</p>
+            <h2>Add Column</h2>
+          </div>
+          <button class="icon-btn" type="button" data-close-dialog aria-label="Close dialog">x</button>
+        </div>
+        <label>
+          Column name
+          <input id="columnName" type="text" required placeholder="Phone screen" />
+        </label>
+        <div class="dialog-actions">
+          <button class="ghost-btn" type="button" data-close-dialog>Cancel</button>
+          <button class="primary-btn" type="submit">Add Column</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="columnTemplate">
+      <section class="column">
+        <header class="column-header">
+          <h2></h2>
+          <div class="column-actions">
+            <span class="count"></span>
+            <button class="column-menu" type="button" title="Delete empty column">x</button>
+          </div>
+        </header>
+        <div class="cards" tabindex="0"></div>
+      </section>
+    </template>
+
+    <template id="cardTemplate">
+      <article class="job-card" draggable="true">
+        <button class="card-summary" type="button">
+          <span class="company-icon" aria-hidden="true"></span>
+          <span class="card-text">
+            <strong class="card-title"></strong>
+            <span class="card-company"></span>
+            <span class="card-date"></span>
+          </span>
+        </button>
+        <div class="card-details" hidden>
+          <p class="job-description"></p>
+          <dl>
+            <div>
+              <dt>Company</dt>
+              <dd class="detail-company"></dd>
+            </div>
+            <div>
+              <dt>Applied</dt>
+              <dd class="detail-date"></dd>
+            </div>
+          </dl>
+          <textarea class="notes-input" aria-label="Job notes"></textarea>
+          <div class="card-actions">
+            <a class="job-link" target="_blank" rel="noreferrer">View Job Link</a>
+            <button class="danger-btn delete-job" type="button">Delete</button>
+            <button class="secondary-btn edit-job" type="button">Edit</button>
+            <select class="status-select" aria-label="Change status"></select>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
