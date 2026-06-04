@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.2 - 2026-06-05
+
+Improved LinkedIn capture diagnostics and Easy Apply extraction.
+
+- Added a popup debug log for extension capture attempts.
+- Logged failed capture candidates to extension storage.
+- Added LinkedIn Easy Apply split-pane selector fallbacks.
+- Added selected-card and detail-pane fallback extraction for title, company, and description.
+
 ## v0.1.1 - 2026-06-04
 
 Fixed extension sync and usability issues found during Chrome testing.

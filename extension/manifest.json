@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "HireLevel Capture",
   "description": "Capture LinkedIn job details into the offline HireLevel board.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "permissions": ["storage"],
   "host_permissions": [
     "https://www.linkedin.com/jobs/*",
@@ -24,6 +24,7 @@
     }
   ],
   "action": {
-    "default_title": "HireLevel Capture"
+    "default_title": "HireLevel Capture",
+    "default_popup": "popup.html"
   }
 }

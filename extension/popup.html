@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>HireLevel Capture</title>
+    <style>
+      body {
+        width: 360px;
+        margin: 0;
+        padding: 14px;
+        color: #1d2433;
+        font: 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 16px;
+      }
+
+      button {
+        border: 1px solid #8fcea3;
+        border-radius: 7px;
+        background: #fff;
+        color: #176c42;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+        padding: 8px 10px;
+      }
+
+      #log {
+        display: grid;
+        gap: 10px;
+        max-height: 420px;
+        overflow: auto;
+        margin-top: 12px;
+      }
+
+      article {
+        border: 1px solid #d7e6d2;
+        border-radius: 8px;
+        padding: 10px;
+        background: #fbfffa;
+      }
+
+      pre {
+        overflow: auto;
+        white-space: pre-wrap;
+        margin: 8px 0 0;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>HireLevel Capture Log</h1>
+    <button id="clearLog" type="button">Clear Log</button>
+    <div id="log"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>

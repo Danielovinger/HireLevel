@@ -108,6 +108,13 @@
     const job = { ...scrapeLinkedInJob(), boardId: selectedBoardId, boardName: selectedBoard?.name || "" };
 
     if (!job.title || !job.company) {
+      await writeDebugLog({
+        type: "capture-failed",
+        reason: "missing-title-or-company",
+        url: location.href,
+        job,
+        candidates: collectDebugCandidates(),
+      });
       flash(button, "Could not read job", "#b42318");
       return;
     }
@@ -115,6 +122,7 @@
     const { pendingHireLevelJobs = [] } = await chrome.storage.local.get("pendingHireLevelJobs");
     pendingHireLevelJobs.push(job);
     await chrome.storage.local.set({ pendingHireLevelJobs });
+    await writeDebugLog({ type: "capture-succeeded", url: location.href, job });
     flash(button, selectedBoard ? `Captured for ${selectedBoard.name}` : "Captured. Open tracker.", "#176c42");
   }
 
@@ -161,28 +169,152 @@
   }
 
   function scrapeLinkedInJob() {
+    const selectedCard = getSelectedJobCard();
+    const detailPane = getDetailPane();
     const title = textFromSelectors([
       ".job-details-jobs-unified-top-card__job-title h1",
       ".job-details-jobs-unified-top-card__job-title",
       ".jobs-unified-top-card__job-title h1",
       ".jobs-unified-top-card__job-title",
+      ".job-details-jobs-unified-top-card__job-title-link",
+      ".job-details-jobs-unified-top-card__title",
+      ".jobs-details-top-card__job-title",
+      ".job-view-layout h1",
       "h1",
-    ]);
+    ]) || inferTitleFromPane(detailPane) || inferTitleFromCard(selectedCard);
     const company = cleanCompany(
       textFromSelectors([
         ".job-details-jobs-unified-top-card__company-name a",
         ".job-details-jobs-unified-top-card__company-name",
         ".jobs-unified-top-card__company-name a",
         ".jobs-unified-top-card__company-name",
+        ".job-details-jobs-unified-top-card__primary-description a",
+        ".jobs-unified-top-card__primary-description a",
+        ".job-view-layout a[href*='/company/']",
+        "a[href*='/company/']",
       ])
-    );
+    ) || inferCompanyFromPane(detailPane) || inferCompanyFromCard(selectedCard);
     const description = textFromSelectors([
       ".jobs-description__content",
       ".jobs-box__html-content",
       "#job-details",
       ".jobs-description-content__text",
-    ]);
+    ]) || inferDescriptionFromPane(detailPane);
     return { title, company, description, url: location.href, capturedAt: new Date().toISOString(), source: "linkedin" };
+  }
+
+  function getSelectedJobCard() {
+    return (
+      document.querySelector(".jobs-search-results-list__list-item--active") ||
+      document.querySelector(".job-card-container--clickable[aria-current='true']") ||
+      document.querySelector(".job-card-container--clickable.jobs-card-container--active") ||
+      document.querySelector(".jobs-search-results-list__list-item")
+    );
+  }
+
+  function getDetailPane() {
+    return (
+      document.querySelector(".jobs-search__job-details") ||
+      document.querySelector(".jobs-details") ||
+      document.querySelector(".job-view-layout") ||
+      document.querySelector("main")
+    );
+  }
+
+  function inferTitleFromPane(pane) {
+    if (!pane) return "";
+    return cleanText(
+      pane.querySelector("h1")?.innerText ||
+        pane.querySelector("h2")?.innerText ||
+        pane.querySelector("[data-test-job-title]")?.innerText ||
+        ""
+    );
+  }
+
+  function inferCompanyFromPane(pane) {
+    if (!pane) return "";
+    const companyLink = pane.querySelector("a[href*='/company/']");
+    if (companyLink) return cleanCompany(companyLink.innerText);
+    const lines = getCleanLines(pane).slice(0, 8);
+    const title = inferTitleFromPane(pane);
+    const afterTitleIndex = lines.findIndex((line) => line === title);
+    const companyLine = lines.slice(Math.max(0, afterTitleIndex + 1)).find(isLikelyCompanyLine);
+    return cleanCompany(companyLine || "");
+  }
+
+  function inferTitleFromCard(card) {
+    if (!card) return "";
+    return cleanText(
+      card.querySelector(".job-card-list__title--link")?.innerText ||
+        card.querySelector(".job-card-list__title")?.innerText ||
+        card.querySelector("a[href*='/jobs/view/']")?.innerText ||
+        card.querySelector("strong")?.innerText ||
+        ""
+    );
+  }
+
+  function inferCompanyFromCard(card) {
+    if (!card) return "";
+    const lines = getCleanLines(card);
+    const title = inferTitleFromCard(card);
+    return cleanCompany(lines.find((line) => line !== title && isLikelyCompanyLine(line)) || "");
+  }
+
+  function inferDescriptionFromPane(pane) {
+    if (!pane) return "";
+    const lines = getCleanLines(pane);
+    const start = lines.findIndex((line) => line.toLowerCase() === "about the job");
+    if (start === -1) return "";
+    return lines.slice(start + 1).filter(isLikelyDescriptionLine).join("\n");
+  }
+
+  function getCleanLines(element) {
+    return cleanText(element?.innerText || element?.textContent || "")
+      .split(/\n|(?<=\.)\s+(?=[A-Z])/)
+      .map((line) => cleanText(line))
+      .filter(Boolean);
+  }
+
+  function isLikelyCompanyLine(line) {
+    const lower = cleanText(line).toLowerCase();
+    if (!line || line.length > 90) return false;
+    if (lower.includes("applicant") || lower.includes("promoted") || lower.includes("easy apply")) return false;
+    if (lower.includes("tel aviv") || lower.includes("israel") || lower.includes("hybrid") || lower.includes("remote")) return false;
+    if (lower.includes("applied") || lower.includes("week ago") || lower.includes("month ago")) return false;
+    return true;
+  }
+
+  function isLikelyDescriptionLine(line) {
+    const lower = line.toLowerCase();
+    if (["show more", "show less", "apply", "easy apply", "save"].includes(lower)) return false;
+    if (lower.startsWith("people you can reach out to") || lower.startsWith("meet the hiring team")) return false;
+    return true;
+  }
+
+  function collectDebugCandidates() {
+    const selectedCard = getSelectedJobCard();
+    const detailPane = getDetailPane();
+    return {
+      titleSelectors: [
+        textFromSelectors([".job-details-jobs-unified-top-card__job-title", ".jobs-unified-top-card__job-title", "h1"]),
+        inferTitleFromPane(detailPane),
+        inferTitleFromCard(selectedCard),
+      ].filter(Boolean),
+      companySelectors: [
+        textFromSelectors([".job-details-jobs-unified-top-card__company-name", ".jobs-unified-top-card__company-name", "a[href*='/company/']"]),
+        inferCompanyFromPane(detailPane),
+        inferCompanyFromCard(selectedCard),
+      ].filter(Boolean),
+      selectedCardText: getCleanLines(selectedCard).slice(0, 12),
+      detailPaneText: getCleanLines(detailPane).slice(0, 20),
+    };
+  }
+
+  async function writeDebugLog(entry) {
+    const { hireLevelDebugLog = [] } = await chrome.storage.local.get("hireLevelDebugLog");
+    const nextLog = Array.isArray(hireLevelDebugLog) ? hireLevelDebugLog.slice(-24) : [];
+    nextLog.push({ ...entry, at: new Date().toISOString() });
+    await chrome.storage.local.set({ hireLevelDebugLog: nextLog });
   }
 
   function textFromSelectors(selectors) {
