@@ -1,37 +1,66 @@
 (function () {
   const buttonId = "hirelevel-capture";
+  const selectId = "hirelevel-board-select";
 
   init();
 
-  function init() {
-    addCaptureButton();
+  async function init() {
+    await addCaptureControls();
     observePageChanges();
   }
 
-  function addCaptureButton() {
+  async function addCaptureControls() {
     if (document.getElementById(buttonId)) return;
+
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = [
+      "position:fixed",
+      "right:18px",
+      "bottom:18px",
+      "z-index:2147483647",
+      "display:grid",
+      "gap:8px",
+      "font:600 14px system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+    ].join(";");
+
+    const boards = await getBoards();
+    if (boards.length > 1) {
+      const select = document.createElement("select");
+      select.id = selectId;
+      select.style.cssText = [
+        "border:1px solid #176c42",
+        "border-radius:8px",
+        "background:white",
+        "color:#1d2433",
+        "padding:9px 10px",
+        "box-shadow:0 10px 28px rgba(0,0,0,.12)",
+      ].join(";");
+      boards.forEach((board) => {
+        const option = document.createElement("option");
+        option.value = board.id;
+        option.textContent = board.name;
+        select.appendChild(option);
+      });
+      wrapper.appendChild(select);
+    }
 
     const button = document.createElement("button");
     button.id = buttonId;
     button.type = "button";
     button.textContent = "Add to HireLevel";
     button.style.cssText = [
-      "position:fixed",
-      "right:18px",
-      "bottom:18px",
-      "z-index:2147483647",
       "border:1px solid #176c42",
       "border-radius:8px",
       "background:#2f9b61",
       "color:white",
-      "font:600 14px system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
       "padding:10px 14px",
       "box-shadow:0 10px 28px rgba(0,0,0,.18)",
       "cursor:pointer",
     ].join(";");
 
     button.addEventListener("click", captureCurrentJob);
-    document.body.appendChild(button);
+    wrapper.appendChild(button);
+    document.body.appendChild(wrapper);
   }
 
   function observePageChanges() {
@@ -39,7 +68,8 @@
     const observer = new MutationObserver(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
-        addCaptureButton();
+        document.getElementById(buttonId)?.parentElement?.remove();
+        addCaptureControls();
       }
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
@@ -47,15 +77,25 @@
 
   async function captureCurrentJob() {
     const button = document.getElementById(buttonId);
-    const job = scrapeLinkedInJob();
+    const boards = await getBoards();
+    const selectedBoardId = document.getElementById(selectId)?.value || (boards.length === 1 ? boards[0].id : null);
+    const selectedBoard = boards.find((board) => board.id === selectedBoardId);
+    const job = { ...scrapeLinkedInJob(), boardId: selectedBoardId, boardName: selectedBoard?.name || "" };
 
     if (!job.title || !job.company) {
       flash(button, "Could not read job", "#b42318");
       return;
     }
 
-    await chrome.storage.local.set({ pendingOpenJobTrackerJob: job });
-    flash(button, "Captured. Open tracker.", "#176c42");
+    const { pendingHireLevelJobs = [] } = await chrome.storage.local.get("pendingHireLevelJobs");
+    pendingHireLevelJobs.push(job);
+    await chrome.storage.local.set({ pendingHireLevelJobs });
+    flash(button, selectedBoard ? `Captured for ${selectedBoard.name}` : "Captured. Open tracker.", "#176c42");
+  }
+
+  async function getBoards() {
+    const { hireLevelBoards = [] } = await chrome.storage.local.get("hireLevelBoards");
+    return Array.isArray(hireLevelBoards) ? hireLevelBoards : [];
   }
 
   function scrapeLinkedInJob() {
@@ -66,7 +106,6 @@
       ".jobs-unified-top-card__job-title",
       "h1",
     ]);
-
     const company = cleanCompany(
       textFromSelectors([
         ".job-details-jobs-unified-top-card__company-name a",
@@ -75,22 +114,13 @@
         ".jobs-unified-top-card__company-name",
       ])
     );
-
     const description = textFromSelectors([
       ".jobs-description__content",
       ".jobs-box__html-content",
       "#job-details",
       ".jobs-description-content__text",
     ]);
-
-    return {
-      title,
-      company,
-      description,
-      url: location.href,
-      capturedAt: new Date().toISOString(),
-      source: "linkedin",
-    };
+    return { title, company, description, url: location.href, capturedAt: new Date().toISOString(), source: "linkedin" };
   }
 
   function textFromSelectors(selectors) {

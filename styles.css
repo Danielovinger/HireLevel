@@ -96,17 +96,21 @@ nav {
   gap: 6px;
 }
 
-nav a {
+.nav-link {
   display: flex;
   align-items: center;
+  width: 100%;
   padding: 10px 12px;
   border-radius: 7px;
+  border: 0;
+  background: transparent;
   color: var(--ink);
   text-decoration: none;
+  cursor: pointer;
 }
 
-nav a.active,
-nav a:hover {
+.nav-link.active,
+.nav-link:hover {
   background: #e7f6e7;
   color: var(--green-dark);
 }
@@ -153,6 +157,14 @@ nav a:hover {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.view {
+  min-width: 0;
+}
+
+.active-view {
+  display: block;
 }
 
 .level-panel {
@@ -280,6 +292,17 @@ textarea {
 
 .toolbar {
   padding: 14px 28px;
+}
+
+.board-picker {
+  display: flex;
+  align-items: center;
+  grid-auto-flow: column;
+  gap: 8px;
+}
+
+.board-picker select {
+  width: 220px;
 }
 
 .import-label input {
@@ -506,6 +529,59 @@ label {
   margin-top: 18px;
 }
 
+.settings-view {
+  padding: 0 28px 28px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.settings-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.settings-help,
+.confirm-message {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  max-width: min(360px, calc(100vw - 36px));
+  padding: 12px 14px;
+  border: 1px solid #9dcc99;
+  border-radius: 8px;
+  background: #fbfffa;
+  color: var(--green-dark);
+  box-shadow: var(--shadow);
+  font-weight: 700;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -534,7 +610,8 @@ label {
   }
 
   .topbar-actions,
-  .toolbar {
+  .toolbar,
+  .settings-actions {
     flex-wrap: wrap;
   }
 
@@ -554,6 +631,14 @@ label {
 
   .toolbar {
     padding: 12px 18px;
+  }
+
+  .settings-view {
+    padding: 0 18px 18px;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
   }
 
   .form-grid {

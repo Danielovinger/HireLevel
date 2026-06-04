@@ -1,13 +1,15 @@
-const STORAGE_KEY = "hirelevel-state-v1";
-const LEGACY_STORAGE_KEY = "open-job-tracker-state-v1";
+const STORAGE_KEY = "hirelevel-state-v2";
+const LEGACY_STORAGE_KEYS = ["hirelevel-state-v1", "open-job-tracker-state-v1"];
+const MAX_CUSTOM_COLUMNS = 5;
+const CUSTOM_COLUMN_XP = 25;
 
 const defaultColumns = [
-  { id: "saved", name: "Saved" },
-  { id: "applied", name: "Applied" },
-  { id: "received-answer", name: "First Positive Answer" },
-  { id: "interviewing", name: "Interviewing" },
-  { id: "offer", name: "Offer" },
-  { id: "rejected", name: "Rejected / Withdrawn" },
+  { id: "saved", name: "Saved", type: "default" },
+  { id: "applied", name: "Applied", type: "default" },
+  { id: "received-answer", name: "First Positive Answer", type: "default" },
+  { id: "interviewing", name: "Interviewing", type: "default" },
+  { id: "offer", name: "Offer", type: "default" },
+  { id: "rejected", name: "Rejected / Withdrawn", type: "default" },
 ];
 
 const statusXp = {
@@ -45,43 +47,48 @@ const titleTiers = [
 const romanNumerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 const maxLevel = 200;
 
-const sampleJobs = [
-  {
-    id: createId(),
-    title: "Product Support Engineer",
-    company: "Example Systems",
-    url: "https://example.com/jobs/product-support-engineer",
-    description: "A sample card to show how expanded job details look. Delete it when you add your first real application.",
-    dateApplied: new Date().toISOString().slice(0, 10),
-    status: "applied",
-    notes: "",
-  },
-];
-
 let state = loadState();
 let editingJobId = null;
 let draggedJobId = null;
+let pendingConfirmAction = null;
 
 const board = document.querySelector("#board");
 const columnTemplate = document.querySelector("#columnTemplate");
 const cardTemplate = document.querySelector("#cardTemplate");
 const jobDialog = document.querySelector("#jobDialog");
 const columnDialog = document.querySelector("#columnDialog");
+const boardDialog = document.querySelector("#boardDialog");
+const confirmDialog = document.querySelector("#confirmDialog");
 const jobForm = document.querySelector("#jobForm");
 const columnForm = document.querySelector("#columnForm");
+const boardForm = document.querySelector("#boardForm");
+const confirmForm = document.querySelector("#confirmForm");
 const searchInput = document.querySelector("#searchInput");
 const fetchMessage = document.querySelector("#fetchMessage");
 
 document.querySelector("#addJobBtn").addEventListener("click", () => openJobDialog());
 document.querySelector("#addColumnBtn").addEventListener("click", () => openColumnDialog());
+document.querySelector("#createBoardBtn").addEventListener("click", () => openBoardDialog());
 document.querySelector("#exportBtn").addEventListener("click", exportState);
 document.querySelector("#importInput").addEventListener("change", importState);
 document.querySelector("#fetchJobBtn").addEventListener("click", fetchJobDetails);
 document.querySelector("#parsePastedTextBtn").addEventListener("click", parsePastedText);
-searchInput.addEventListener("input", renderBoard);
+document.querySelector("#boardSelect").addEventListener("change", changeActiveBoard);
+document.querySelector("#xpModeSelect").addEventListener("change", changeXpMode);
+document.querySelector("#renameBoardBtn").addEventListener("click", renameActiveBoard);
+document.querySelector("#resetBoardBtn").addEventListener("click", confirmResetBoard);
+document.querySelector("#resetBoardProgressBtn").addEventListener("click", confirmResetBoardProgression);
+document.querySelector("#resetAccountProgressBtn").addEventListener("click", confirmResetAccountProgression);
+document.querySelector("#deleteBoardBtn").addEventListener("click", confirmDeleteBoard);
+document.querySelector("#confirmNoBtn").addEventListener("click", () => confirmDialog.close());
+searchInput.addEventListener("input", renderApp);
 
 document.querySelectorAll("[data-close-dialog]").forEach((button) => {
   button.addEventListener("click", () => button.closest("dialog").close());
+});
+
+document.querySelectorAll("[data-view]").forEach((button) => {
+  button.addEventListener("click", () => switchView(button.dataset.view));
 });
 
 window.addEventListener("message", handleExtensionMessage);
@@ -89,6 +96,7 @@ window.addEventListener("message", handleExtensionMessage);
 jobForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(jobForm);
+  const board = getActiveBoard();
   const job = {
     id: editingJobId || createId(),
     url: formData.get("url").trim(),
@@ -101,64 +109,139 @@ jobForm.addEventListener("submit", (event) => {
   };
 
   if (editingJobId) {
-    state.jobs = state.jobs.map((existing) => (existing.id === editingJobId ? job : existing));
+    board.jobs = board.jobs.map((existing) => (existing.id === editingJobId ? job : existing));
   } else {
-    state.jobs.push(job);
+    board.jobs.push(job);
   }
 
+  const earnedXp = awardXpForColumn(board.id, job.id, job.status);
+  if (earnedXp > 0) showXpToast(job, earnedXp);
   saveState();
   jobDialog.close();
-  renderBoard();
+  renderApp();
 });
 
 columnForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  const board = getActiveBoard();
   const name = document.querySelector("#columnName").value.trim();
   if (!name) return;
 
-  state.columns.push({
-    id: slugify(name, true),
+  if (getCustomColumns(board).length >= MAX_CUSTOM_COLUMNS) {
+    alert(`Each board can have up to ${MAX_CUSTOM_COLUMNS} custom columns.`);
+    return;
+  }
+
+  board.columns.push({
+    id: slugify(name, board.columns, true),
     name,
+    type: "custom",
   });
   saveState();
   columnDialog.close();
-  renderBoard();
+  renderApp();
 });
 
-renderBoard();
+boardForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = document.querySelector("#newBoardName").value.trim();
+  if (!name) return;
+  const newBoard = createBoard(name, []);
+  state.boards.push(newBoard);
+  state.activeBoardId = newBoard.id;
+  saveState();
+  boardDialog.close();
+  renderApp();
+});
+
+confirmForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (pendingConfirmAction) pendingConfirmAction();
+  pendingConfirmAction = null;
+  confirmDialog.close();
+  saveState();
+  renderApp();
+});
+
+renderApp();
 
 function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+  const saved = localStorage.getItem(STORAGE_KEY) || LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
   if (!saved) {
-    return { columns: defaultColumns, jobs: sampleJobs };
+    const board = createBoard("My Job Search", []);
+    return { version: 2, settings: { xpMode: "global" }, activeBoardId: board.id, boards: [board], xpEvents: [] };
   }
 
   try {
-    const parsed = JSON.parse(saved);
-    return {
-      columns: normalizeColumns(parsed.columns),
-      jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
-    };
+    return migrateState(JSON.parse(saved));
   } catch {
-    return { columns: defaultColumns, jobs: sampleJobs };
+    const board = createBoard("My Job Search", []);
+    return { version: 2, settings: { xpMode: "global" }, activeBoardId: board.id, boards: [board], xpEvents: [] };
   }
+}
+
+function migrateState(parsed) {
+  if (Array.isArray(parsed.boards)) {
+    const boards = parsed.boards.map((board) => ({
+      id: board.id || createId(),
+      name: board.name || "My Job Search",
+      columns: normalizeColumns(board.columns),
+      jobs: Array.isArray(board.jobs) ? board.jobs : [],
+    }));
+    return {
+      version: 2,
+      settings: { xpMode: parsed.settings?.xpMode || "global" },
+      activeBoardId: boards.some((board) => board.id === parsed.activeBoardId) ? parsed.activeBoardId : boards[0]?.id,
+      boards: boards.length ? boards : [createBoard("My Job Search", [])],
+      xpEvents: Array.isArray(parsed.xpEvents) ? parsed.xpEvents : [],
+    };
+  }
+
+  const legacyBoard = createBoard("My Job Search", Array.isArray(parsed.jobs) ? parsed.jobs : []);
+  legacyBoard.columns = normalizeColumns(parsed.columns);
+  const migrated = {
+    version: 2,
+    settings: { xpMode: "global" },
+    activeBoardId: legacyBoard.id,
+    boards: [legacyBoard],
+    xpEvents: [],
+  };
+
+  legacyBoard.jobs.forEach((job) => {
+    if (job.status && job.status !== "saved") {
+      const xp = getColumnXp(legacyBoard, job.status);
+      if (xp > 0) migrated.xpEvents.push(createXpEvent(legacyBoard.id, job.id, job.status, xp));
+    }
+  });
+  return migrated;
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  syncExtensionBoardList();
   const status = document.querySelector("#storageStatus");
   if (status) status.textContent = `Saved locally at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+function renderApp() {
+  ensureActiveBoard();
+  renderBoardSelector();
+  renderSettings();
+  renderLevelPanel();
+  renderBoard();
+  syncExtensionBoardList();
+}
+
 function renderBoard() {
   board.innerHTML = "";
+  const activeBoard = getActiveBoard();
   const query = searchInput.value.trim().toLowerCase();
-  renderLevelPanel();
+  document.querySelector("#activeBoardTitle").textContent = activeBoard.name;
 
-  state.columns.forEach((column) => {
+  activeBoard.columns.forEach((column) => {
     const columnElement = columnTemplate.content.firstElementChild.cloneNode(true);
     const cardsElement = columnElement.querySelector(".cards");
-    const columnJobs = state.jobs.filter((job) => job.status === column.id && matchesQuery(job, query));
+    const columnJobs = activeBoard.jobs.filter((job) => job.status === column.id && matchesQuery(job, query));
 
     columnElement.dataset.columnId = column.id;
     columnElement.querySelector("h2").textContent = column.name;
@@ -183,48 +266,30 @@ function renderBoard() {
   });
 }
 
-function handleExtensionMessage(event) {
-  if (event.source !== window) return;
-  if (event.data?.source !== "hirelevel-extension") return;
-  if (event.data?.type !== "ADD_JOB") return;
-
-  const job = normalizeCapturedJob(event.data.job);
-  if (!job) return;
-
-  const existing = state.jobs.find((item) => item.url && item.url === job.url);
-  if (existing) {
-    state.jobs = state.jobs.map((item) => (item.id === existing.id ? { ...item, ...job, id: item.id } : item));
-  } else {
-    state.jobs.push(job);
-  }
-
-  saveState();
-  renderBoard();
+function renderBoardSelector() {
+  const select = document.querySelector("#boardSelect");
+  select.innerHTML = "";
+  state.boards.forEach((board) => {
+    const option = document.createElement("option");
+    option.value = board.id;
+    option.textContent = board.name;
+    option.selected = board.id === state.activeBoardId;
+    select.appendChild(option);
+  });
 }
 
-function normalizeCapturedJob(rawJob) {
-  const title = cleanText(rawJob?.title);
-  const company = cleanText(rawJob?.company);
-  const description = cleanText(rawJob?.description);
-  const url = cleanText(rawJob?.url);
-
-  if (!title || !company) return null;
-
-  return {
-    id: createId(),
-    title,
-    company,
-    description,
-    url,
-    dateApplied: new Date().toISOString().slice(0, 10),
-    status: "applied",
-    notes: "Captured from browser extension.",
-  };
+function renderSettings() {
+  const activeBoard = getActiveBoard();
+  document.querySelector("#xpModeSelect").value = state.settings.xpMode;
+  document.querySelector("#boardNameInput").value = activeBoard.name;
+  document.querySelector("#customColumnCount").textContent = `Custom columns: ${getCustomColumns(activeBoard).length} / ${MAX_CUSTOM_COLUMNS}`;
+  document.querySelector("#deleteBoardBtn").disabled = state.boards.length <= 1;
 }
 
 function renderLevelPanel() {
-  const total = calculateTotalXp();
+  const total = calculateVisibleXp();
   const levelState = calculateLevel(total);
+  const suffix = state.settings.xpMode === "global" ? "account XP" : "board XP";
 
   document.querySelector("#levelText").textContent = `Level ${levelState.level}`;
   document.querySelector("#levelTitle").textContent = getLevelTitle(levelState.level);
@@ -233,7 +298,7 @@ function renderLevelPanel() {
     levelState.level === maxLevel
       ? "Max level reached"
       : `${formatNumber(levelState.currentXp)} / ${formatNumber(levelState.requiredXp)} XP`;
-  document.querySelector("#totalXp").textContent = `${formatNumber(total)} total XP`;
+  document.querySelector("#totalXp").textContent = `${formatNumber(total)} ${suffix}`;
 }
 
 function renderCard(job) {
@@ -263,7 +328,6 @@ function renderCard(job) {
   summary.addEventListener("click", () => {
     details.hidden = !details.hidden;
   });
-
   card.addEventListener("dragstart", () => {
     draggedJobId = job.id;
     card.classList.add("dragging");
@@ -273,17 +337,98 @@ function renderCard(job) {
     card.classList.remove("dragging");
   });
 
-  card.querySelector(".notes-input").addEventListener("change", (event) => {
-    updateJob(job.id, { notes: event.target.value });
-  });
+  card.querySelector(".notes-input").addEventListener("change", (event) => updateJob(job.id, { notes: event.target.value }));
   card.querySelector(".delete-job").addEventListener("click", () => deleteJob(job.id));
   card.querySelector(".edit-job").addEventListener("click", () => openJobDialog(job));
 
   const statusSelect = card.querySelector(".status-select");
   populateStatusSelect(statusSelect, job.status);
   statusSelect.addEventListener("change", (event) => moveJob(job.id, event.target.value));
-
   return card;
+}
+
+function switchView(viewId) {
+  document.querySelectorAll(".view").forEach((view) => {
+    view.hidden = view.id !== viewId;
+    view.classList.toggle("active-view", view.id === viewId);
+  });
+  document.querySelectorAll("[data-view]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === viewId);
+  });
+}
+
+function changeActiveBoard(event) {
+  state.activeBoardId = event.target.value;
+  saveState();
+  renderApp();
+}
+
+function changeXpMode(event) {
+  state.settings.xpMode = event.target.value;
+  saveState();
+  renderApp();
+}
+
+function renameActiveBoard() {
+  const name = document.querySelector("#boardNameInput").value.trim();
+  if (!name) return;
+  getActiveBoard().name = name;
+  saveState();
+  renderApp();
+}
+
+function confirmResetBoard() {
+  const activeBoard = getActiveBoard();
+  openConfirm(
+    "Reset current board?",
+    "This removes all jobs and custom columns from the current board. XP progression will not be reset.",
+    () => {
+      activeBoard.jobs = [];
+      activeBoard.columns = cloneDefaultColumns();
+    }
+  );
+}
+
+function confirmResetBoardProgression() {
+  const activeBoard = getActiveBoard();
+  openConfirm(
+    "Reset board progression?",
+    "This removes XP earned on the current board. Jobs and columns will remain.",
+    () => {
+      state.xpEvents = state.xpEvents.filter((event) => event.boardId !== activeBoard.id);
+    }
+  );
+}
+
+function confirmResetAccountProgression() {
+  openConfirm(
+    "Reset account progression?",
+    "This removes all XP earned across every board. Jobs, boards, and columns will remain.",
+    () => {
+      state.xpEvents = [];
+    }
+  );
+}
+
+function confirmDeleteBoard() {
+  const activeBoard = getActiveBoard();
+  if (state.boards.length <= 1) return;
+  openConfirm(
+    "Delete current board?",
+    "This removes the selected board and its jobs. XP events from this board will also be removed.",
+    () => {
+      state.xpEvents = state.xpEvents.filter((event) => event.boardId !== activeBoard.id);
+      state.boards = state.boards.filter((board) => board.id !== activeBoard.id);
+      state.activeBoardId = state.boards[0].id;
+    }
+  );
+}
+
+function openConfirm(title, message, action) {
+  pendingConfirmAction = action;
+  document.querySelector("#confirmTitle").textContent = title;
+  document.querySelector("#confirmMessage").textContent = message;
+  confirmDialog.showModal();
 }
 
 function openJobDialog(job = null) {
@@ -292,7 +437,6 @@ function openJobDialog(job = null) {
   fetchMessage.textContent = "";
   document.querySelector("#jobDialogTitle").textContent = job ? "Edit Job" : "Add Job";
   populateStatusSelect(document.querySelector("#jobStatus"), job?.status || "applied");
-
   document.querySelector("#jobUrl").value = job?.url || "";
   document.querySelector("#jobTitle").value = job?.title || "";
   document.querySelector("#jobCompany").value = job?.company || "";
@@ -304,8 +448,77 @@ function openJobDialog(job = null) {
 }
 
 function openColumnDialog() {
+  const activeBoard = getActiveBoard();
+  if (getCustomColumns(activeBoard).length >= MAX_CUSTOM_COLUMNS) {
+    alert(`Each board can have up to ${MAX_CUSTOM_COLUMNS} custom columns.`);
+    return;
+  }
   columnForm.reset();
   columnDialog.showModal();
+}
+
+function openBoardDialog() {
+  boardForm.reset();
+  boardDialog.showModal();
+}
+
+function handleExtensionMessage(event) {
+  if (event.source !== window) return;
+  if (event.data?.source !== "hirelevel-extension") return;
+  if (event.data?.type === "REQUEST_BOARD_SYNC") {
+    syncExtensionBoardList();
+    return;
+  }
+  if (event.data?.type !== "ADD_JOBS") return;
+
+  const jobs = Array.isArray(event.data.jobs) ? event.data.jobs : [];
+  jobs.forEach((rawJob) => addCapturedJob(rawJob));
+  saveState();
+  renderApp();
+}
+
+function addCapturedJob(rawJob) {
+  const board = state.boards.find((item) => item.id === rawJob?.boardId) || getActiveBoard();
+  const job = normalizeCapturedJob(rawJob);
+  if (!job) return;
+
+  const existing = board.jobs.find((item) => item.url && item.url === job.url);
+  if (existing) {
+    const mergedJob = {
+      ...existing,
+      title: job.title,
+      company: job.company,
+      description: job.description,
+      url: job.url,
+      id: existing.id,
+      status: existing.status,
+    };
+    board.jobs = board.jobs.map((item) => (item.id === existing.id ? mergedJob : item));
+    const earnedXp = awardXpForColumn(board.id, existing.id, existing.status || "applied");
+    if (earnedXp > 0) showXpToast(existing, earnedXp);
+  } else {
+    board.jobs.push(job);
+    const earnedXp = awardXpForColumn(board.id, job.id, job.status);
+    if (earnedXp > 0) showXpToast(job, earnedXp);
+  }
+}
+
+function normalizeCapturedJob(rawJob) {
+  const title = cleanText(rawJob?.title);
+  const company = cleanText(rawJob?.company);
+  const description = cleanText(rawJob?.description);
+  const url = cleanText(rawJob?.url);
+  if (!title || !company) return null;
+  return {
+    id: createId(),
+    title,
+    company,
+    description,
+    url,
+    dateApplied: new Date().toISOString().slice(0, 10),
+    status: "applied",
+    notes: "Captured from browser extension.",
+  };
 }
 
 async function fetchJobDetails() {
@@ -314,22 +527,18 @@ async function fetchJobDetails() {
   const companyInput = document.querySelector("#jobCompany");
   const descriptionInput = document.querySelector("#jobDescription");
   const url = urlInput.value.trim();
-
   if (!url) {
     fetchMessage.textContent = "Enter a job URL first.";
     return;
   }
-
   fetchMessage.textContent = "Trying to read the job page...";
   applyUrlHeuristics(url);
-
   try {
     const response = await fetch(url, { mode: "cors" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
     const doc = new DOMParser().parseFromString(html, "text/html");
     const metadata = extractJobMetadata(doc, url);
-
     titleInput.value = metadata.title || titleInput.value;
     companyInput.value = metadata.company || companyInput.value;
     descriptionInput.value = metadata.description || descriptionInput.value;
@@ -340,108 +549,32 @@ async function fetchJobDetails() {
 }
 
 function parsePastedText() {
-  const text = document.querySelector("#jobPageText").value;
-  const parsed = parseJobPageText(text);
-
+  const parsed = parseJobPageText(document.querySelector("#jobPageText").value);
   if (!parsed.title && !parsed.company && !parsed.description) {
     fetchMessage.textContent = "I could not find job details in that pasted text. Try copying only the job details panel.";
     return;
   }
-
-  const titleInput = document.querySelector("#jobTitle");
-  const companyInput = document.querySelector("#jobCompany");
-  const descriptionInput = document.querySelector("#jobDescription");
-
-  titleInput.value = parsed.title || titleInput.value;
-  companyInput.value = parsed.company || companyInput.value;
-  descriptionInput.value = parsed.description || descriptionInput.value;
+  document.querySelector("#jobTitle").value = parsed.title || document.querySelector("#jobTitle").value;
+  document.querySelector("#jobCompany").value = parsed.company || document.querySelector("#jobCompany").value;
+  document.querySelector("#jobDescription").value = parsed.description || document.querySelector("#jobDescription").value;
   fetchMessage.textContent = "Pasted text parsed. Review the fields before saving.";
 }
 
 function parseJobPageText(text) {
-  const lines = String(text || "")
-    .split(/\r?\n/)
-    .map((line) => cleanText(line))
-    .filter(Boolean);
-
+  const lines = String(text || "").split(/\r?\n/).map((line) => cleanText(line)).filter(Boolean);
   if (!lines.length) return {};
-
   const uniqueLines = [];
   lines.forEach((line) => {
     if (uniqueLines[uniqueLines.length - 1] !== line) uniqueLines.push(line);
   });
-
-  const descriptionStart = findMarkerIndex(uniqueLines, [
-    "About the job",
-    "Job description",
-    "About this job",
-    "Responsibilities",
-    "What you'll do",
-    "What you will do",
-  ]);
-
+  const descriptionStart = findMarkerIndex(uniqueLines, ["About the job", "Job description", "About this job", "Responsibilities", "What you'll do", "What you will do"]);
   const headingLines = descriptionStart >= 0 ? uniqueLines.slice(0, descriptionStart) : uniqueLines;
   const usefulHeadingLines = headingLines.filter(isLikelyHeadingLine);
-  const title = usefulHeadingLines[0] || "";
-  const company = cleanCompanyLine(usefulHeadingLines[1] || "");
-  const description =
-    descriptionStart >= 0
-      ? uniqueLines
-          .slice(descriptionStart + 1)
-          .filter(isLikelyDescriptionLine)
-          .join("\n")
-      : "";
-
   return {
-    title,
-    company,
-    description,
+    title: usefulHeadingLines[0] || "",
+    company: cleanCompanyLine(usefulHeadingLines[1] || ""),
+    description: descriptionStart >= 0 ? uniqueLines.slice(descriptionStart + 1).filter(isLikelyDescriptionLine).join("\n") : "",
   };
-}
-
-function findMarkerIndex(lines, markers) {
-  return lines.findIndex((line) => markers.some((marker) => line.toLowerCase() === marker.toLowerCase()));
-}
-
-function isLikelyHeadingLine(line) {
-  const lower = line.toLowerCase();
-  const exactNoise = new Set([
-    "linkedin",
-    "home",
-    "jobs",
-    "messaging",
-    "notifications",
-    "me",
-    "search",
-    "save",
-    "apply",
-    "easy apply",
-    "show more",
-    "show less",
-    "share",
-    "report this job",
-  ]);
-
-  if (exactNoise.has(lower)) return false;
-  if (lower.includes("applicants")) return false;
-  if (lower.includes("posted")) return false;
-  if (lower.includes("connections")) return false;
-  if (lower.includes("promoted")) return false;
-  if (lower.includes("see who")) return false;
-  if (/^\d/.test(line)) return false;
-  return line.length <= 120;
-}
-
-function isLikelyDescriptionLine(line) {
-  const lower = line.toLowerCase();
-  if (["show more", "show less", "apply", "easy apply", "save"].includes(lower)) return false;
-  if (lower.startsWith("similar jobs")) return false;
-  if (lower.startsWith("people also viewed")) return false;
-  return true;
-}
-
-function cleanCompanyLine(line) {
-  return cleanText(line.split(" · ")[0].split(" | ")[0]);
 }
 
 function extractJobMetadata(doc, url) {
@@ -449,80 +582,100 @@ function extractJobMetadata(doc, url) {
     .map((script) => safeJson(script.textContent))
     .flatMap((item) => (Array.isArray(item) ? item : [item]))
     .find((item) => item && (item["@type"] === "JobPosting" || item.title));
-
-  const title = jsonLd?.title || getMeta(doc, "og:title") || doc.querySelector("title")?.textContent || "";
-  const company =
-    jsonLd?.hiringOrganization?.name ||
-    getMeta(doc, "og:site_name") ||
-    companyFromUrl(url);
-  const description =
-    stripHtml(jsonLd?.description || "") ||
-    getMeta(doc, "description") ||
-    getMeta(doc, "og:description") ||
-    "";
-
   return {
-    title: cleanText(title),
-    company: cleanText(company),
-    description: cleanText(description),
+    title: cleanText(jsonLd?.title || getMeta(doc, "og:title") || doc.querySelector("title")?.textContent || ""),
+    company: cleanText(jsonLd?.hiringOrganization?.name || getMeta(doc, "og:site_name") || companyFromUrl(url)),
+    description: cleanText(stripHtml(jsonLd?.description || "") || getMeta(doc, "description") || getMeta(doc, "og:description") || ""),
   };
-}
-
-function applyUrlHeuristics(url) {
-  const titleInput = document.querySelector("#jobTitle");
-  const companyInput = document.querySelector("#jobCompany");
-  if (!companyInput.value) companyInput.value = companyFromUrl(url);
-  if (!titleInput.value) titleInput.value = titleFromUrl(url);
-}
-
-function matchesQuery(job, query) {
-  if (!query) return true;
-  return [job.title, job.company, job.description, job.notes]
-    .join(" ")
-    .toLowerCase()
-    .includes(query);
 }
 
 function moveJob(jobId, status) {
   if (!jobId) return;
   updateJob(jobId, { status });
-  renderBoard();
+  const job = getActiveBoard().jobs.find((item) => item.id === jobId);
+  const earnedXp = awardXpForColumn(getActiveBoard().id, jobId, status);
+  if (job && earnedXp > 0) showXpToast(job, earnedXp);
+  saveState();
+  renderApp();
 }
 
 function updateJob(jobId, patch) {
-  state.jobs = state.jobs.map((job) => (job.id === jobId ? { ...job, ...patch } : job));
+  const board = getActiveBoard();
+  board.jobs = board.jobs.map((job) => (job.id === jobId ? { ...job, ...patch } : job));
   saveState();
 }
 
 function deleteJob(jobId) {
-  const job = state.jobs.find((item) => item.id === jobId);
+  const board = getActiveBoard();
+  const job = board.jobs.find((item) => item.id === jobId);
   if (!job) return;
-  if (!confirm(`Delete "${job.title}" from the tracker?`)) return;
-  state.jobs = state.jobs.filter((item) => item.id !== jobId);
+  if (!confirm(`Delete "${job.title}" from the tracker? XP already earned from this job will stay.`)) return;
+  board.jobs = board.jobs.filter((item) => item.id !== jobId);
   saveState();
-  renderBoard();
+  renderApp();
 }
 
 function deleteColumn(columnId) {
-  const hasJobs = state.jobs.some((job) => job.status === columnId);
+  const board = getActiveBoard();
+  const hasJobs = board.jobs.some((job) => job.status === columnId);
   if (hasJobs) {
     alert("Move or delete the jobs in this column before removing it.");
     return;
   }
-  state.columns = state.columns.filter((column) => column.id !== columnId);
+  board.columns = board.columns.filter((column) => column.id !== columnId);
   saveState();
-  renderBoard();
+  renderApp();
 }
 
-function populateStatusSelect(select, selected) {
-  select.innerHTML = "";
-  state.columns.forEach((column) => {
-    const option = document.createElement("option");
-    option.value = column.id;
-    option.textContent = column.name;
-    option.selected = column.id === selected;
-    select.appendChild(option);
-  });
+function awardXpForColumn(boardId, jobId, columnId) {
+  const board = state.boards.find((item) => item.id === boardId);
+  if (!board || !jobId || !columnId) return 0;
+  const xp = getColumnXp(board, columnId);
+  if (xp <= 0) return 0;
+  const alreadyEarned = state.xpEvents.some((event) => event.boardId === boardId && event.jobId === jobId && event.columnId === columnId);
+  if (alreadyEarned) return 0;
+  state.xpEvents.push(createXpEvent(boardId, jobId, columnId, xp));
+  return xp;
+}
+
+function showXpToast(job, xp) {
+  const toast = document.querySelector("#toast");
+  toast.textContent = `Added ${job.title} at ${job.company} +${formatNumber(xp)} XP`;
+  toast.hidden = false;
+  window.clearTimeout(showXpToast.timeoutId);
+  showXpToast.timeoutId = window.setTimeout(() => {
+    toast.hidden = true;
+  }, 2600);
+}
+
+function createXpEvent(boardId, jobId, columnId, xp) {
+  return { id: createId(), boardId, jobId, columnId, xp, earnedAt: new Date().toISOString() };
+}
+
+function getColumnXp(board, columnId) {
+  if (statusXp[columnId] !== undefined) return statusXp[columnId];
+  return board.columns.some((column) => column.id === columnId && column.type === "custom") ? CUSTOM_COLUMN_XP : 0;
+}
+
+function calculateVisibleXp() {
+  if (state.settings.xpMode === "per-board") {
+    return state.xpEvents.filter((event) => event.boardId === state.activeBoardId).reduce((total, event) => total + event.xp, 0);
+  }
+  return state.xpEvents.reduce((total, event) => total + event.xp, 0);
+}
+
+function calculateLevel(totalXp) {
+  let level = 1;
+  let remainingXp = totalXp;
+  while (level < maxLevel) {
+    const requiredXp = getLevelRequirement(level);
+    if (remainingXp < requiredXp) {
+      return { level, currentXp: remainingXp, requiredXp, percent: Math.min(100, Math.round((remainingXp / requiredXp) * 100)) };
+    }
+    remainingXp -= requiredXp;
+    level += 1;
+  }
+  return { level: maxLevel, currentXp: 0, requiredXp: 0, percent: 100 };
 }
 
 function exportState() {
@@ -538,15 +691,10 @@ function exportState() {
 async function importState(event) {
   const [file] = event.target.files;
   if (!file) return;
-
   try {
-    const imported = JSON.parse(await file.text());
-    if (!Array.isArray(imported.columns) || !Array.isArray(imported.jobs)) {
-      throw new Error("Invalid tracker file");
-    }
-    state = imported;
+    state = migrateState(JSON.parse(await file.text()));
     saveState();
-    renderBoard();
+    renderApp();
   } catch {
     alert("That JSON file does not look like a HireLevel export.");
   } finally {
@@ -554,48 +702,68 @@ async function importState(event) {
   }
 }
 
-function isDefaultColumn(columnId) {
-  return defaultColumns.some((column) => column.id === columnId);
+function syncExtensionBoardList() {
+  window.postMessage(
+    {
+      source: "hirelevel-app",
+      type: "SYNC_BOARDS",
+      boards: state.boards.map((board) => ({ id: board.id, name: board.name })),
+      activeBoardId: state.activeBoardId,
+    },
+    window.location.origin === "null" ? "*" : window.location.origin
+  );
+}
+
+function createBoard(name, jobs = []) {
+  return { id: createId(), name, columns: cloneDefaultColumns(), jobs };
+}
+
+function cloneDefaultColumns() {
+  return defaultColumns.map((column) => ({ ...column }));
 }
 
 function normalizeColumns(columns) {
   const incoming = Array.isArray(columns) && columns.length ? columns : defaultColumns;
   const defaultNames = new Map(defaultColumns.map((column) => [column.id, column.name]));
-
   return incoming.map((column) => ({
     ...column,
+    type: isDefaultColumn(column.id) ? "default" : column.type || "custom",
     name: defaultNames.get(column.id) || column.name,
   }));
 }
 
-function calculateTotalXp() {
-  return state.jobs.reduce((total, job) => total + (statusXp[job.status] || 0), 0);
+function getActiveBoard() {
+  ensureActiveBoard();
+  return state.boards.find((board) => board.id === state.activeBoardId);
 }
 
-function calculateLevel(totalXp) {
-  let level = 1;
-  let remainingXp = totalXp;
+function ensureActiveBoard() {
+  if (!state.boards.length) state.boards.push(createBoard("My Job Search", []));
+  if (!state.boards.some((board) => board.id === state.activeBoardId)) state.activeBoardId = state.boards[0].id;
+}
 
-  while (level < maxLevel) {
-    const requiredXp = getLevelRequirement(level);
-    if (remainingXp < requiredXp) {
-      return {
-        level,
-        currentXp: remainingXp,
-        requiredXp,
-        percent: Math.min(100, Math.round((remainingXp / requiredXp) * 100)),
-      };
-    }
-    remainingXp -= requiredXp;
-    level += 1;
-  }
+function getCustomColumns(board) {
+  return board.columns.filter((column) => !isDefaultColumn(column.id));
+}
 
-  return {
-    level: maxLevel,
-    currentXp: 0,
-    requiredXp: 0,
-    percent: 100,
-  };
+function populateStatusSelect(select, selected) {
+  select.innerHTML = "";
+  getActiveBoard().columns.forEach((column) => {
+    const option = document.createElement("option");
+    option.value = column.id;
+    option.textContent = column.name;
+    option.selected = column.id === selected;
+    select.appendChild(option);
+  });
+}
+
+function matchesQuery(job, query) {
+  if (!query) return true;
+  return [job.title, job.company, job.description, job.notes].join(" ").toLowerCase().includes(query);
+}
+
+function isDefaultColumn(columnId) {
+  return defaultColumns.some((column) => column.id === columnId);
 }
 
 function getLevelRequirement(level) {
@@ -605,12 +773,33 @@ function getLevelRequirement(level) {
 function getLevelTitle(level) {
   if (level >= maxLevel) return "Job Holder";
   const tierIndex = Math.min(titleTiers.length - 1, Math.floor((level - 1) / 10));
-  const numeral = romanNumerals[(level - 1) % 10];
-  return `${titleTiers[tierIndex]} ${numeral}`;
+  return `${titleTiers[tierIndex]} ${romanNumerals[(level - 1) % 10]}`;
 }
 
-function formatNumber(number) {
-  return new Intl.NumberFormat().format(number);
+function findMarkerIndex(lines, markers) {
+  return lines.findIndex((line) => markers.some((marker) => line.toLowerCase() === marker.toLowerCase()));
+}
+
+function isLikelyHeadingLine(line) {
+  const lower = line.toLowerCase();
+  const exactNoise = new Set(["linkedin", "home", "jobs", "messaging", "notifications", "me", "search", "save", "apply", "easy apply", "show more", "show less", "share", "report this job"]);
+  if (exactNoise.has(lower)) return false;
+  if (lower.includes("applicants") || lower.includes("posted") || lower.includes("connections") || lower.includes("promoted") || lower.includes("see who")) return false;
+  if (/^\d/.test(line)) return false;
+  return line.length <= 120;
+}
+
+function isLikelyDescriptionLine(line) {
+  const lower = line.toLowerCase();
+  if (["show more", "show less", "apply", "easy apply", "save"].includes(lower)) return false;
+  return !lower.startsWith("similar jobs") && !lower.startsWith("people also viewed");
+}
+
+function applyUrlHeuristics(url) {
+  const titleInput = document.querySelector("#jobTitle");
+  const companyInput = document.querySelector("#jobCompany");
+  if (!companyInput.value) companyInput.value = companyFromUrl(url);
+  if (!titleInput.value) titleInput.value = titleFromUrl(url);
 }
 
 function getMeta(doc, name) {
@@ -635,9 +824,17 @@ function cleanText(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
 
+function cleanCompanyLine(line) {
+  return cleanText(line.split(" · ")[0].split(" | ")[0]);
+}
+
 function formatDate(date) {
   if (!date) return "No date";
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${date}T12:00:00`));
+}
+
+function formatNumber(number) {
+  return new Intl.NumberFormat().format(number);
 }
 
 function companyFromUrl(url) {
@@ -661,26 +858,15 @@ function titleFromUrl(url) {
 }
 
 function titleCase(text) {
-  return cleanText(text)
-    .split(" ")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+  return cleanText(text).split(" ").filter(Boolean).map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 }
 
-function slugify(text, ensureUnique = false) {
-  const base =
-    text
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "column";
-
+function slugify(text, columns, ensureUnique = false) {
+  const base = text.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "column";
   if (!ensureUnique) return base;
-
   let candidate = base;
   let index = 2;
-  while (state.columns.some((column) => column.id === candidate)) {
+  while (columns.some((column) => column.id === candidate)) {
     candidate = `${base}-${index}`;
     index += 1;
   }
@@ -688,18 +874,12 @@ function slugify(text, ensureUnique = false) {
 }
 
 function initials(company) {
-  return cleanText(company)
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase())
-    .join("") || "?";
+  return cleanText(company).split(" ").filter(Boolean).slice(0, 2).map((word) => word[0]?.toUpperCase()).join("") || "?";
 }
 
 function getFaviconUrl(url) {
   try {
-    const parsed = new URL(url);
-    return `${parsed.origin}/favicon.ico`;
+    return `${new URL(url).origin}/favicon.ico`;
   } catch {
     return "";
   }
@@ -707,5 +887,5 @@ function getFaviconUrl(url) {
 
 function createId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  return `job-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }

@@ -11,6 +11,9 @@ HireLevel is a small offline-first job application board inspired by common web-
 - URL fallback heuristics when a job site blocks local scraping.
 - Paste-and-parse fallback for LinkedIn and other blocked job pages.
 - Application XP, levels, progress meter, and title ranks.
+- Multiple job-search boards.
+- Global account XP or separate XP per board.
+- Board and progression reset controls with confirmation prompts.
 - Kanban-style columns for Saved, Applied, Received Answer, Interviewing, Offer, and Rejected.
 - Add custom columns.
 - Drag jobs between columns or change status from an expanded card.
@@ -36,6 +39,9 @@ Jobs reward XP based on their current status:
 - Rejected / Withdrawn: 25 XP
 - Interviewing: 625 XP
 - Offer: 390,625 XP
+- Any custom column: 25 XP
+
+Each job can earn XP from a specific column only once. Moving a job out of a column and back into it will not grant that column's XP again. Deleting a job does not remove XP that was already earned.
 
 Level requirements use:
 
@@ -44,6 +50,17 @@ XP needed for next level = 5 + 4 * (currentLevel - 1)^2
 ```
 
 The maximum level is 200. Level 200 uses the special title **Job Holder**.
+
+## Boards And Settings
+
+HireLevel supports multiple boards. Use the board selector to switch boards, or create a new board from the main toolbar.
+
+The Settings tab lets you choose whether XP is shown as:
+
+- Global account XP across every board.
+- Separate XP for the selected board.
+
+The current board can be reset to its default state without resetting XP. Board progression can also be reset separately. Account progression reset is only available from Settings.
 
 ## Run Locally
 
@@ -68,7 +85,7 @@ To install it locally:
 3. Choose **Load unpacked**.
 4. Select the `extension/` folder.
 
-On LinkedIn job pages, click **Add to HireLevel**. Then open the tracker board and the captured job will be added to Applied.
+On LinkedIn job pages, click **Add to HireLevel**. If the extension knows about multiple boards, it will ask which board to use. If it only knows one board, it captures directly for that board. If the tracker has not been opened yet, the extension queues the job and the tracker imports it when opened.
 
 If you open the tracker through `file://`, enable **Allow access to file URLs** for the extension in the browser's extension details page. Alternatively, run the tracker on `localhost`, which is usually smoother for extension testing.
 

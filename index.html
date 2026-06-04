@@ -17,9 +17,8 @@
           </div>
         </div>
         <nav>
-          <a class="active" href="#board">Application Board</a>
-          <a href="#archive">Archive</a>
-          <a href="#settings">Settings</a>
+          <button class="nav-link active" type="button" data-view="boardView">Application Board</button>
+          <button class="nav-link" type="button" data-view="settingsView">Settings</button>
         </nav>
         <div class="sidebar-footer">
           <span id="storageStatus">Saved locally</span>
@@ -30,7 +29,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">Private by design</p>
-            <h1>My Job Search</h1>
+            <h1 id="activeBoardTitle">My Job Search</h1>
           </div>
           <div class="topbar-actions">
             <label class="search">
@@ -54,16 +53,55 @@
           </aside>
         </header>
 
-        <section class="toolbar" aria-label="Board actions">
-          <button id="addColumnBtn" class="ghost-btn" type="button">+ Add Column</button>
-          <button id="exportBtn" class="ghost-btn" type="button">Export JSON</button>
-          <label class="import-label">
-            Import JSON
-            <input id="importInput" type="file" accept="application/json" />
-          </label>
+        <section id="boardView" class="view active-view">
+          <section class="toolbar" aria-label="Board actions">
+            <label class="board-picker">
+              Board
+              <select id="boardSelect"></select>
+            </label>
+            <button id="createBoardBtn" class="ghost-btn" type="button">+ New Board</button>
+            <button id="addColumnBtn" class="ghost-btn" type="button">+ Add Column</button>
+            <button id="exportBtn" class="ghost-btn" type="button">Export JSON</button>
+            <label class="import-label">
+              Import JSON
+              <input id="importInput" type="file" accept="application/json" />
+            </label>
+          </section>
+
+          <section id="board" class="board" aria-label="Job application board"></section>
         </section>
 
-        <section id="board" class="board" aria-label="Job application board"></section>
+        <section id="settingsView" class="view settings-view" hidden>
+          <div class="settings-grid">
+            <section class="settings-panel">
+              <h2>Progression</h2>
+              <label>
+                XP mode
+                <select id="xpModeSelect">
+                  <option value="global">Global account XP</option>
+                  <option value="per-board">Separate XP per board</option>
+                </select>
+              </label>
+              <p class="settings-help">Global XP combines all boards. Per-board XP shows progress for the selected board only.</p>
+              <button id="resetAccountProgressBtn" class="danger-btn" type="button">Reset Account Progression</button>
+            </section>
+
+            <section class="settings-panel">
+              <h2>Current Board</h2>
+              <label>
+                Board name
+                <input id="boardNameInput" type="text" />
+              </label>
+              <div class="settings-actions">
+                <button id="renameBoardBtn" class="secondary-btn" type="button">Rename Board</button>
+                <button id="resetBoardBtn" class="danger-btn" type="button">Reset Board</button>
+                <button id="resetBoardProgressBtn" class="danger-btn" type="button">Reset Board Progression</button>
+                <button id="deleteBoardBtn" class="danger-btn" type="button">Delete Board</button>
+              </div>
+              <p id="customColumnCount" class="settings-help">Custom columns: 0 / 5</p>
+            </section>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -147,6 +185,42 @@
       </form>
     </dialog>
 
+    <dialog id="boardDialog" class="dialog small-dialog">
+      <form id="boardForm" method="dialog">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Board</p>
+            <h2>Create Board</h2>
+          </div>
+          <button class="icon-btn" type="button" data-close-dialog aria-label="Close dialog">x</button>
+        </div>
+        <label>
+          Board name
+          <input id="newBoardName" type="text" required placeholder="Remote roles" />
+        </label>
+        <div class="dialog-actions">
+          <button class="ghost-btn" type="button" data-close-dialog>Cancel</button>
+          <button class="primary-btn" type="submit">Create Board</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="confirmDialog" class="dialog small-dialog">
+      <form id="confirmForm" method="dialog">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Confirm</p>
+            <h2 id="confirmTitle">Are you sure?</h2>
+          </div>
+        </div>
+        <p id="confirmMessage" class="confirm-message"></p>
+        <div class="dialog-actions">
+          <button id="confirmNoBtn" class="ghost-btn" type="button">No</button>
+          <button id="confirmYesBtn" class="danger-btn" type="submit">Yes</button>
+        </div>
+      </form>
+    </dialog>
+
     <template id="columnTemplate">
       <section class="column">
         <header class="column-header">
@@ -192,6 +266,8 @@
         </div>
       </article>
     </template>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
     <script src="app.js"></script>
   </body>
