@@ -2,7 +2,7 @@
   if (!isHireLevel()) return;
 
   window.addEventListener("message", handleAppMessage);
-  window.postMessage({ source: "hirelevel-extension", type: "REQUEST_BOARD_SYNC" }, window.location.origin === "null" ? "*" : window.location.origin);
+  window.postMessage({ source: "hirelevel-extension", type: "REQUEST_BOARD_SYNC" }, "*");
   await importPendingJobs();
 })();
 
@@ -29,7 +29,7 @@ async function importPendingJobs() {
       type: "ADD_JOBS",
       jobs,
     },
-    window.location.origin === "null" ? "*" : window.location.origin
+    "*"
   );
 
   await chrome.storage.local.remove("pendingHireLevelJobs");

@@ -710,7 +710,7 @@ function syncExtensionBoardList() {
       boards: state.boards.map((board) => ({ id: board.id, name: board.name })),
       activeBoardId: state.activeBoardId,
     },
-    window.location.origin === "null" ? "*" : window.location.origin
+    "*"
   );
 }
 

@@ -89,6 +89,8 @@ On LinkedIn job pages, click **Add to HireLevel**. If the extension knows about 
 
 If you open the tracker through `file://`, enable **Allow access to file URLs** for the extension in the browser's extension details page. Alternatively, run the tracker on `localhost`, which is usually smoother for extension testing.
 
+After pulling updates, click the extension reload button in `chrome://extensions` or `edge://extensions`, then refresh any open LinkedIn and HireLevel tabs.
+
 ## Privacy
 
 All tracker data is saved locally in your browser. Export JSON regularly if you want a portable backup or want to move the board to another browser or machine.

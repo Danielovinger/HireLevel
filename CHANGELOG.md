@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.1 - 2026-06-04
+
+Fixed extension sync and usability issues found during Chrome testing.
+
+- Fixed `file://` tracker messaging so pending extension captures import correctly.
+- Fixed board sync from the tracker to the extension on local file pages.
+- Made the LinkedIn capture widget draggable with saved position.
+- Refreshed the LinkedIn board selector when the tracker syncs new boards.
+
 ## v0.1.0 - 2026-06-04
 
 Added board-aware progression and extension capture upgrades.

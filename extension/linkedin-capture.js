@@ -1,4 +1,5 @@
 (function () {
+  const wrapperId = "hirelevel-capture-wrapper";
   const buttonId = "hirelevel-capture";
   const selectId = "hirelevel-board-select";
 
@@ -6,6 +7,11 @@
 
   async function init() {
     await addCaptureControls();
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local" || !changes.hireLevelBoards) return;
+      document.getElementById(wrapperId)?.remove();
+      addCaptureControls();
+    });
     observePageChanges();
   }
 
@@ -13,15 +19,34 @@
     if (document.getElementById(buttonId)) return;
 
     const wrapper = document.createElement("div");
+    wrapper.id = wrapperId;
+    const position = await getPosition();
     wrapper.style.cssText = [
       "position:fixed",
-      "right:18px",
-      "bottom:18px",
+      `left:${position.left}px`,
+      `top:${position.top}px`,
       "z-index:2147483647",
       "display:grid",
       "gap:8px",
       "font:600 14px system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
     ].join(";");
+
+    const handle = document.createElement("div");
+    handle.textContent = "HireLevel";
+    handle.title = "Drag to move";
+    handle.style.cssText = [
+      "border:1px solid #c8dfc2",
+      "border-radius:8px",
+      "background:white",
+      "color:#176c42",
+      "padding:7px 10px",
+      "box-shadow:0 10px 28px rgba(0,0,0,.10)",
+      "cursor:move",
+      "user-select:none",
+      "text-align:center",
+    ].join(";");
+    handle.addEventListener("pointerdown", (event) => startDrag(event, wrapper));
+    wrapper.appendChild(handle);
 
     const boards = await getBoards();
     if (boards.length > 1) {
@@ -68,7 +93,7 @@
     const observer = new MutationObserver(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
-        document.getElementById(buttonId)?.parentElement?.remove();
+        document.getElementById(wrapperId)?.remove();
         addCaptureControls();
       }
     });
@@ -96,6 +121,43 @@
   async function getBoards() {
     const { hireLevelBoards = [] } = await chrome.storage.local.get("hireLevelBoards");
     return Array.isArray(hireLevelBoards) ? hireLevelBoards : [];
+  }
+
+  async function getPosition() {
+    const { hireLevelCapturePosition } = await chrome.storage.local.get("hireLevelCapturePosition");
+    if (hireLevelCapturePosition && Number.isFinite(hireLevelCapturePosition.left) && Number.isFinite(hireLevelCapturePosition.top)) {
+      return {
+        left: Math.max(12, Math.min(window.innerWidth - 180, hireLevelCapturePosition.left)),
+        top: Math.max(12, Math.min(window.innerHeight - 90, hireLevelCapturePosition.top)),
+      };
+    }
+    return { left: Math.max(12, window.innerWidth - 220), top: Math.max(12, window.innerHeight - 110) };
+  }
+
+  function startDrag(event, wrapper) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const rect = wrapper.getBoundingClientRect();
+    const startLeft = rect.left;
+    const startTop = rect.top;
+
+    const move = (moveEvent) => {
+      const left = Math.max(12, Math.min(window.innerWidth - wrapper.offsetWidth - 12, startLeft + moveEvent.clientX - startX));
+      const top = Math.max(12, Math.min(window.innerHeight - wrapper.offsetHeight - 12, startTop + moveEvent.clientY - startY));
+      wrapper.style.left = `${left}px`;
+      wrapper.style.top = `${top}px`;
+    };
+
+    const stop = async () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", stop);
+      const rect = wrapper.getBoundingClientRect();
+      await chrome.storage.local.set({ hireLevelCapturePosition: { left: rect.left, top: rect.top } });
+    };
+
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", stop);
   }
 
   function scrapeLinkedInJob() {
