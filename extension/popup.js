@@ -6,9 +6,21 @@ clearButton.addEventListener("click", async () => {
   render([]);
 });
 
-chrome.storage.local.get("hireLevelDebugLog").then(({ hireLevelDebugLog = [] }) => {
-  render(Array.isArray(hireLevelDebugLog) ? hireLevelDebugLog.slice().reverse() : []);
+loadLog();
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local" || !changes.hireLevelDebugLog) return;
+  renderLog(changes.hireLevelDebugLog.newValue);
 });
+
+async function loadLog() {
+  const { hireLevelDebugLog = [] } = await chrome.storage.local.get("hireLevelDebugLog");
+  renderLog(hireLevelDebugLog);
+}
+
+function renderLog(log) {
+  render(Array.isArray(log) ? log.slice().reverse() : []);
+}
 
 function render(entries) {
   logElement.innerHTML = "";

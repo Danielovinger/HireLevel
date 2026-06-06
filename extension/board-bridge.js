@@ -2,6 +2,7 @@
   if (!isHireLevel()) return;
 
   window.addEventListener("message", handleAppMessage);
+  chrome.storage.onChanged.addListener(handleStorageChange);
   window.postMessage({ source: "hirelevel-extension", type: "REQUEST_BOARD_SYNC" }, "*");
   await importPendingJobs();
 })();
@@ -9,19 +10,38 @@
 async function handleAppMessage(event) {
   if (event.source !== window) return;
   if (event.data?.source !== "hirelevel-app") return;
+  if (event.data?.type === "IMPORT_RESULT") {
+    await writeDebugLog({ type: "board-import-result", results: event.data.results || [] });
+    return;
+  }
   if (event.data?.type !== "SYNC_BOARDS") return;
 
   const boards = Array.isArray(event.data.boards) ? event.data.boards : [];
   await chrome.storage.local.set({
     hireLevelBoards: boards,
     hireLevelActiveBoardId: event.data.activeBoardId || boards[0]?.id || null,
+    hireLevelTheme: event.data.theme || null,
   });
 }
 
 async function importPendingJobs() {
-  const { pendingHireLevelJobs = [] } = await chrome.storage.local.get("pendingHireLevelJobs");
-  const jobs = Array.isArray(pendingHireLevelJobs) ? pendingHireLevelJobs : [];
+  const storage = await chrome.storage.local.get(null);
+  const pendingEntries = Object.entries(storage).filter(([key]) => key.startsWith("pendingHireLevelJob_"));
+  const legacyJobs = Array.isArray(storage.pendingHireLevelJobs) ? storage.pendingHireLevelJobs : [];
+  const jobs = [...pendingEntries.map(([, job]) => job), ...legacyJobs].filter(Boolean);
   if (!jobs.length) return;
+
+  await writeDebugLog({
+    type: "board-import-posted",
+    jobs: jobs.map((job) => ({
+      title: job.title || "",
+      company: job.company || "",
+      source: job.source || "",
+      externalId: job.externalId || "",
+      boardId: job.boardId || "",
+      status: job.status || "",
+    })),
+  });
 
   window.postMessage(
     {
@@ -32,9 +52,25 @@ async function importPendingJobs() {
     "*"
   );
 
-  await chrome.storage.local.remove("pendingHireLevelJobs");
+  await chrome.storage.local.remove([...pendingEntries.map(([key]) => key), "pendingHireLevelJobs"]);
+}
+
+async function handleStorageChange(changes, areaName) {
+  if (areaName !== "local") return;
+  const hasPendingJobs =
+    Boolean(changes.pendingHireLevelJobs?.newValue?.length) ||
+    Object.keys(changes).some((key) => key.startsWith("pendingHireLevelJob_") && changes[key].newValue);
+  if (!hasPendingJobs) return;
+  await importPendingJobs();
 }
 
 function isHireLevel() {
   return document.title === "HireLevel" && Boolean(document.querySelector("#board"));
+}
+
+async function writeDebugLog(entry) {
+  const { hireLevelDebugLog = [] } = await chrome.storage.local.get("hireLevelDebugLog");
+  const nextLog = Array.isArray(hireLevelDebugLog) ? hireLevelDebugLog.slice(-24) : [];
+  nextLog.push({ ...entry, at: new Date().toISOString() });
+  await chrome.storage.local.set({ hireLevelDebugLog: nextLog });
 }

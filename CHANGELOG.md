@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.0.0 - 2026-06-06
+
+First stable HireLevel release.
+
+- Added Glassdoor capture support alongside LinkedIn capture.
+- Added company logo capture and a branded HireLevel extension icon.
+- Added live board importing from extension captures without refreshing the tracker.
+- Added board card reordering and improved long-column scrolling.
+- Added light/dark theme settings and multiple light color schemes.
+- Added safer extension capture logging and live-updating popup diagnostics.
+- Updated the XP curve so 25 XP actions remain useful through level 100 while level 200 stays offer-driven.
+- Added extension widget board/status selectors with session memory for repeated captures.
+- Fixed board deletion so global XP remains account history while per-board XP can be removed with the board.
+- Documented the two-phase XP curve, supported job-board capture flow, and future Windows ZIP usage.
+
 ## v0.1.2 - 2026-06-05
 
 Improved LinkedIn capture diagnostics and Easy Apply extraction.

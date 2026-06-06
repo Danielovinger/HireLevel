@@ -46,6 +46,8 @@ const titleTiers = [
 
 const romanNumerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 const maxLevel = 200;
+const endgameLevelStart = 100;
+const endgameCurveMultiplier = 4.6;
 
 let state = loadState();
 let editingJobId = null;
@@ -75,6 +77,8 @@ document.querySelector("#fetchJobBtn").addEventListener("click", fetchJobDetails
 document.querySelector("#parsePastedTextBtn").addEventListener("click", parsePastedText);
 document.querySelector("#boardSelect").addEventListener("change", changeActiveBoard);
 document.querySelector("#xpModeSelect").addEventListener("change", changeXpMode);
+document.querySelector("#themeModeSelect").addEventListener("change", changeThemeMode);
+document.querySelector("#colorSchemeSelect").addEventListener("change", changeColorScheme);
 document.querySelector("#renameBoardBtn").addEventListener("click", renameActiveBoard);
 document.querySelector("#resetBoardBtn").addEventListener("click", confirmResetBoard);
 document.querySelector("#resetBoardProgressBtn").addEventListener("click", confirmResetBoardProgression);
@@ -169,14 +173,14 @@ function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY) || LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
   if (!saved) {
     const board = createBoard("My Job Search", []);
-    return { version: 2, settings: { xpMode: "global" }, activeBoardId: board.id, boards: [board], xpEvents: [] };
+    return { version: 2, settings: getDefaultSettings(), activeBoardId: board.id, boards: [board], xpEvents: [] };
   }
 
   try {
     return migrateState(JSON.parse(saved));
   } catch {
     const board = createBoard("My Job Search", []);
-    return { version: 2, settings: { xpMode: "global" }, activeBoardId: board.id, boards: [board], xpEvents: [] };
+    return { version: 2, settings: getDefaultSettings(), activeBoardId: board.id, boards: [board], xpEvents: [] };
   }
 }
 
@@ -190,7 +194,7 @@ function migrateState(parsed) {
     }));
     return {
       version: 2,
-      settings: { xpMode: parsed.settings?.xpMode || "global" },
+      settings: normalizeSettings(parsed.settings),
       activeBoardId: boards.some((board) => board.id === parsed.activeBoardId) ? parsed.activeBoardId : boards[0]?.id,
       boards: boards.length ? boards : [createBoard("My Job Search", [])],
       xpEvents: Array.isArray(parsed.xpEvents) ? parsed.xpEvents : [],
@@ -201,7 +205,7 @@ function migrateState(parsed) {
   legacyBoard.columns = normalizeColumns(parsed.columns);
   const migrated = {
     version: 2,
-    settings: { xpMode: "global" },
+    settings: getDefaultSettings(),
     activeBoardId: legacyBoard.id,
     boards: [legacyBoard],
     xpEvents: [],
@@ -225,6 +229,7 @@ function saveState() {
 
 function renderApp() {
   ensureActiveBoard();
+  applyTheme();
   renderBoardSelector();
   renderSettings();
   renderLevelPanel();
@@ -254,11 +259,20 @@ function renderBoard() {
     cardsElement.addEventListener("dragover", (event) => {
       event.preventDefault();
       columnElement.classList.add("drag-over");
+      clearDropMarkers();
+      const dropTarget = getCardDropTarget(cardsElement, event.clientY);
+      dropTarget?.classList.add("drop-before");
     });
-    cardsElement.addEventListener("dragleave", () => columnElement.classList.remove("drag-over"));
-    cardsElement.addEventListener("drop", () => {
+    cardsElement.addEventListener("dragleave", (event) => {
+      if (cardsElement.contains(event.relatedTarget)) return;
       columnElement.classList.remove("drag-over");
-      moveJob(draggedJobId, column.id);
+      clearDropMarkers();
+    });
+    cardsElement.addEventListener("drop", () => {
+      const beforeJobId = cardsElement.querySelector(".drop-before")?.dataset.jobId || null;
+      columnElement.classList.remove("drag-over");
+      clearDropMarkers();
+      moveJob(draggedJobId, column.id, beforeJobId);
     });
 
     columnJobs.forEach((job) => cardsElement.appendChild(renderCard(job)));
@@ -281,6 +295,8 @@ function renderBoardSelector() {
 function renderSettings() {
   const activeBoard = getActiveBoard();
   document.querySelector("#xpModeSelect").value = state.settings.xpMode;
+  document.querySelector("#themeModeSelect").value = state.settings.themeMode;
+  document.querySelector("#colorSchemeSelect").value = state.settings.colorScheme;
   document.querySelector("#boardNameInput").value = activeBoard.name;
   document.querySelector("#customColumnCount").textContent = `Custom columns: ${getCustomColumns(activeBoard).length} / ${MAX_CUSTOM_COLUMNS}`;
   document.querySelector("#deleteBoardBtn").disabled = state.boards.length <= 1;
@@ -306,7 +322,7 @@ function renderCard(job) {
   const summary = card.querySelector(".card-summary");
   const details = card.querySelector(".card-details");
   const icon = card.querySelector(".company-icon");
-  const faviconUrl = getFaviconUrl(job.url);
+  const faviconUrl = getCompanyIconUrl(job);
 
   card.dataset.jobId = job.id;
   card.querySelector(".card-title").textContent = job.title;
@@ -335,6 +351,7 @@ function renderCard(job) {
   card.addEventListener("dragend", () => {
     draggedJobId = null;
     card.classList.remove("dragging");
+    clearDropMarkers();
   });
 
   card.querySelector(".notes-input").addEventListener("change", (event) => updateJob(job.id, { notes: event.target.value }));
@@ -365,6 +382,18 @@ function changeActiveBoard(event) {
 
 function changeXpMode(event) {
   state.settings.xpMode = event.target.value;
+  saveState();
+  renderApp();
+}
+
+function changeThemeMode(event) {
+  state.settings.themeMode = event.target.value;
+  saveState();
+  renderApp();
+}
+
+function changeColorScheme(event) {
+  state.settings.colorScheme = event.target.value;
   saveState();
   renderApp();
 }
@@ -413,11 +442,14 @@ function confirmResetAccountProgression() {
 function confirmDeleteBoard() {
   const activeBoard = getActiveBoard();
   if (state.boards.length <= 1) return;
+  const keepsXp = state.settings.xpMode === "global";
   openConfirm(
     "Delete current board?",
-    "This removes the selected board and its jobs. XP events from this board will also be removed.",
+    keepsXp
+      ? "This removes the selected board and its jobs. Global XP already earned from this board will remain."
+      : "This removes the selected board, its jobs, and XP earned on this board.",
     () => {
-      state.xpEvents = state.xpEvents.filter((event) => event.boardId !== activeBoard.id);
+      if (!keepsXp) state.xpEvents = state.xpEvents.filter((event) => event.boardId !== activeBoard.id);
       state.boards = state.boards.filter((board) => board.id !== activeBoard.id);
       state.activeBoardId = state.boards[0].id;
     }
@@ -472,17 +504,26 @@ function handleExtensionMessage(event) {
   if (event.data?.type !== "ADD_JOBS") return;
 
   const jobs = Array.isArray(event.data.jobs) ? event.data.jobs : [];
-  jobs.forEach((rawJob) => addCapturedJob(rawJob));
+  const results = jobs.map((rawJob) => addCapturedJob(rawJob));
   saveState();
   renderApp();
+  window.postMessage(
+    {
+      source: "hirelevel-app",
+      type: "IMPORT_RESULT",
+      results,
+    },
+    "*"
+  );
 }
 
 function addCapturedJob(rawJob) {
   const board = state.boards.find((item) => item.id === rawJob?.boardId) || getActiveBoard();
   const job = normalizeCapturedJob(rawJob);
-  if (!job) return;
+  if (!job) return { action: "skipped", reason: "missing-title-or-company", title: rawJob?.title || "", company: rawJob?.company || "" };
 
-  const existing = board.jobs.find((item) => item.url && item.url === job.url);
+  const jobIdentity = getJobIdentity(job);
+  const existing = board.jobs.find((item) => getJobIdentity(item) === jobIdentity);
   if (existing) {
     const mergedJob = {
       ...existing,
@@ -490,16 +531,21 @@ function addCapturedJob(rawJob) {
       company: job.company,
       description: job.description,
       url: job.url,
+      source: job.source,
+      externalId: job.externalId,
+      companyLogoUrl: job.companyLogoUrl,
       id: existing.id,
       status: existing.status,
     };
     board.jobs = board.jobs.map((item) => (item.id === existing.id ? mergedJob : item));
     const earnedXp = awardXpForColumn(board.id, existing.id, existing.status || "applied");
     if (earnedXp > 0) showXpToast(existing, earnedXp);
+    return { action: "updated", boardId: board.id, jobId: existing.id, identity: jobIdentity, title: job.title, company: job.company };
   } else {
     board.jobs.push(job);
     const earnedXp = awardXpForColumn(board.id, job.id, job.status);
     if (earnedXp > 0) showXpToast(job, earnedXp);
+    return { action: "added", boardId: board.id, jobId: job.id, identity: jobIdentity, title: job.title, company: job.company };
   }
 }
 
@@ -508,6 +554,10 @@ function normalizeCapturedJob(rawJob) {
   const company = cleanText(rawJob?.company);
   const description = cleanText(rawJob?.description);
   const url = cleanText(rawJob?.url);
+  const source = cleanText(rawJob?.source);
+  const externalId = cleanText(rawJob?.externalId);
+  const companyLogoUrl = cleanText(rawJob?.companyLogoUrl);
+  const status = normalizeInitialCaptureStatus(rawJob?.status);
   if (!title || !company) return null;
   return {
     id: createId(),
@@ -515,10 +565,22 @@ function normalizeCapturedJob(rawJob) {
     company,
     description,
     url,
+    source,
+    externalId,
+    companyLogoUrl,
     dateApplied: new Date().toISOString().slice(0, 10),
-    status: "applied",
+    status,
     notes: "Captured from browser extension.",
   };
+}
+
+function normalizeInitialCaptureStatus(status) {
+  return status === "saved" ? "saved" : "applied";
+}
+
+function getJobIdentity(job) {
+  if (job?.source && job?.externalId) return `${job.source}:${job.externalId}`;
+  return job?.url || job?.id || "";
 }
 
 async function fetchJobDetails() {
@@ -589,14 +651,40 @@ function extractJobMetadata(doc, url) {
   };
 }
 
-function moveJob(jobId, status) {
+function moveJob(jobId, status, beforeJobId = null) {
   if (!jobId) return;
-  updateJob(jobId, { status });
-  const job = getActiveBoard().jobs.find((item) => item.id === jobId);
-  const earnedXp = awardXpForColumn(getActiveBoard().id, jobId, status);
+  const board = getActiveBoard();
+  const jobIndex = board.jobs.findIndex((item) => item.id === jobId);
+  if (jobIndex < 0 || jobId === beforeJobId) return;
+
+  const [job] = board.jobs.splice(jobIndex, 1);
+  const movedJob = { ...job, status };
+  const beforeIndex = beforeJobId ? board.jobs.findIndex((item) => item.id === beforeJobId) : -1;
+  const insertIndex = beforeIndex >= 0 ? beforeIndex : getAppendIndexForStatus(board.jobs, status);
+  board.jobs.splice(insertIndex, 0, movedJob);
+
+  const earnedXp = awardXpForColumn(board.id, jobId, status);
   if (job && earnedXp > 0) showXpToast(job, earnedXp);
   saveState();
   renderApp();
+}
+
+function getAppendIndexForStatus(jobs, status) {
+  for (let index = jobs.length - 1; index >= 0; index -= 1) {
+    if (jobs[index].status === status) return index + 1;
+  }
+  return jobs.length;
+}
+
+function getCardDropTarget(cardsElement, pointerY) {
+  return Array.from(cardsElement.querySelectorAll(".job-card:not(.dragging)")).find((card) => {
+    const box = card.getBoundingClientRect();
+    return pointerY < box.top + box.height / 2;
+  });
+}
+
+function clearDropMarkers() {
+  document.querySelectorAll(".drop-before").forEach((card) => card.classList.remove("drop-before"));
 }
 
 function updateJob(jobId, patch) {
@@ -709,9 +797,43 @@ function syncExtensionBoardList() {
       type: "SYNC_BOARDS",
       boards: state.boards.map((board) => ({ id: board.id, name: board.name })),
       activeBoardId: state.activeBoardId,
+      theme: getExtensionTheme(),
     },
     "*"
   );
+}
+
+function getDefaultSettings() {
+  return { xpMode: "global", themeMode: "light", colorScheme: "green" };
+}
+
+function normalizeSettings(settings = {}) {
+  const defaults = getDefaultSettings();
+  return {
+    xpMode: ["global", "per-board"].includes(settings.xpMode) ? settings.xpMode : defaults.xpMode,
+    themeMode: ["light", "dark"].includes(settings.themeMode) ? settings.themeMode : defaults.themeMode,
+    colorScheme: ["green", "mint", "sky", "lavender", "rose"].includes(settings.colorScheme) ? settings.colorScheme : defaults.colorScheme,
+  };
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = state.settings.themeMode;
+  document.documentElement.dataset.colorScheme = state.settings.colorScheme;
+}
+
+function getExtensionTheme() {
+  const style = getComputedStyle(document.documentElement);
+  return {
+    mode: state.settings.themeMode,
+    colorScheme: state.settings.colorScheme,
+    panel: style.getPropertyValue("--panel").trim(),
+    ink: style.getPropertyValue("--ink").trim(),
+    line: style.getPropertyValue("--line").trim(),
+    accent: style.getPropertyValue("--accent").trim(),
+    accentDark: style.getPropertyValue("--accent-dark").trim(),
+    accentSoft: style.getPropertyValue("--accent-soft").trim(),
+    shadow: state.settings.themeMode === "dark" ? "0 10px 28px rgba(0,0,0,.36)" : "0 10px 28px rgba(0,0,0,.14)",
+  };
 }
 
 function createBoard(name, jobs = []) {
@@ -767,7 +889,8 @@ function isDefaultColumn(columnId) {
 }
 
 function getLevelRequirement(level) {
-  return 5 + 4 * (level - 1) ** 2;
+  if (level < endgameLevelStart) return 5 + 3 * (level - 1);
+  return Math.round(300 + endgameCurveMultiplier * (level - (endgameLevelStart - 1)) ** 2);
 }
 
 function getLevelTitle(level) {
@@ -875,6 +998,20 @@ function slugify(text, columns, ensureUnique = false) {
 
 function initials(company) {
   return cleanText(company).split(" ").filter(Boolean).slice(0, 2).map((word) => word[0]?.toUpperCase()).join("") || "?";
+}
+
+function getCompanyIconUrl(job) {
+  if (job.companyLogoUrl) return job.companyLogoUrl;
+  if (isLinkedInUrl(job.url)) return "";
+  return getFaviconUrl(job.url);
+}
+
+function isLinkedInUrl(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").toLowerCase() === "linkedin.com";
+  } catch {
+    return false;
+  }
 }
 
 function getFaviconUrl(url) {

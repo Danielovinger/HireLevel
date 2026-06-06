@@ -2,13 +2,16 @@
   const wrapperId = "hirelevel-capture-wrapper";
   const buttonId = "hirelevel-capture";
   const selectId = "hirelevel-board-select";
+  const statusSelectId = "hirelevel-status-select";
+  let selectedBoardMemory = "";
+  let selectedStatusMemory = "applied";
 
   init();
 
   async function init() {
     await addCaptureControls();
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== "local" || !changes.hireLevelBoards) return;
+      if (areaName !== "local" || (!changes.hireLevelBoards && !changes.hireLevelTheme)) return;
       document.getElementById(wrapperId)?.remove();
       addCaptureControls();
     });
@@ -17,10 +20,15 @@
 
   async function addCaptureControls() {
     if (document.getElementById(buttonId)) return;
+    if (!document.body) {
+      window.setTimeout(addCaptureControls, 300);
+      return;
+    }
 
     const wrapper = document.createElement("div");
     wrapper.id = wrapperId;
     const position = await getPosition();
+    const theme = await getTheme();
     wrapper.style.cssText = [
       "position:fixed",
       `left:${position.left}px`,
@@ -28,6 +36,7 @@
       "z-index:2147483647",
       "display:grid",
       "gap:8px",
+      "width:220px",
       "font:600 14px system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
     ].join(";");
 
@@ -35,12 +44,14 @@
     handle.textContent = "HireLevel";
     handle.title = "Drag to move";
     handle.style.cssText = [
-      "border:1px solid #c8dfc2",
+      `border:1px solid ${theme.line}`,
       "border-radius:8px",
-      "background:white",
-      "color:#176c42",
-      "padding:7px 10px",
-      "box-shadow:0 10px 28px rgba(0,0,0,.10)",
+      `background:${theme.panel}`,
+      `color:${theme.accentDark}`,
+      "min-height:40px",
+      "line-height:20px",
+      "padding:9px 12px",
+      `box-shadow:${theme.shadow}`,
       "cursor:move",
       "user-select:none",
       "text-align:center",
@@ -50,36 +61,57 @@
 
     const boards = await getBoards();
     if (boards.length > 1) {
+      wrapper.appendChild(createFieldLabel("Select board", theme));
       const select = document.createElement("select");
       select.id = selectId;
-      select.style.cssText = [
-        "border:1px solid #176c42",
-        "border-radius:8px",
-        "background:white",
-        "color:#1d2433",
-        "padding:9px 10px",
-        "box-shadow:0 10px 28px rgba(0,0,0,.12)",
-      ].join(";");
+      select.style.cssText = getSelectStyles(theme).join(";");
       boards.forEach((board) => {
         const option = document.createElement("option");
         option.value = board.id;
         option.textContent = board.name;
         select.appendChild(option);
       });
+      if (boards.some((board) => board.id === selectedBoardMemory)) select.value = selectedBoardMemory;
+      select.addEventListener("change", () => {
+        selectedBoardMemory = select.value;
+      });
       wrapper.appendChild(select);
     }
+
+    wrapper.appendChild(createFieldLabel("Add to", theme));
+    const statusSelect = document.createElement("select");
+    statusSelect.id = statusSelectId;
+    statusSelect.title = "Choose whether to save or apply";
+    statusSelect.style.cssText = getSelectStyles(theme).join(";");
+    [
+      { value: "applied", label: "Applied" },
+      { value: "saved", label: "Saved Jobs" },
+    ].forEach((status) => {
+      const option = document.createElement("option");
+      option.value = status.value;
+      option.textContent = status.label;
+      statusSelect.appendChild(option);
+    });
+    statusSelect.value = selectedStatusMemory;
+    statusSelect.addEventListener("change", () => {
+      selectedStatusMemory = getSelectedInitialStatus();
+    });
+    wrapper.appendChild(statusSelect);
 
     const button = document.createElement("button");
     button.id = buttonId;
     button.type = "button";
     button.textContent = "Add to HireLevel";
     button.style.cssText = [
-      "border:1px solid #176c42",
+      `border:1px solid ${theme.accentDark}`,
       "border-radius:8px",
-      "background:#2f9b61",
+      `background:${theme.accent}`,
       "color:white",
+      "width:220px",
+      "min-height:44px",
+      "line-height:20px",
       "padding:10px 14px",
-      "box-shadow:0 10px 28px rgba(0,0,0,.18)",
+      `box-shadow:${theme.shadow}`,
       "cursor:pointer",
     ].join(";");
 
@@ -90,22 +122,32 @@
 
   function observePageChanges() {
     let lastUrl = location.href;
+    let restoreTimer = null;
     const observer = new MutationObserver(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
         document.getElementById(wrapperId)?.remove();
         addCaptureControls();
+        return;
       }
+      if (document.getElementById(buttonId)) return;
+      window.clearTimeout(restoreTimer);
+      restoreTimer = window.setTimeout(addCaptureControls, 300);
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }
 
   async function captureCurrentJob() {
     const button = document.getElementById(buttonId);
+    const captureId = createCaptureId();
     const boards = await getBoards();
     const selectedBoardId = document.getElementById(selectId)?.value || (boards.length === 1 ? boards[0].id : null);
+    selectedBoardMemory = selectedBoardId || selectedBoardMemory;
     const selectedBoard = boards.find((board) => board.id === selectedBoardId);
-    const job = { ...scrapeLinkedInJob(), boardId: selectedBoardId, boardName: selectedBoard?.name || "" };
+    const status = getSelectedInitialStatus();
+    selectedStatusMemory = status;
+    const job = { ...scrapeLinkedInJob(), captureId, boardId: selectedBoardId, boardName: selectedBoard?.name || "", status };
+    await writeDebugLog({ type: "capture-clicked", source: "linkedin", captureId, url: location.href, job });
 
     if (!job.title || !job.company) {
       await writeDebugLog({
@@ -119,27 +161,82 @@
       return;
     }
 
-    const { pendingHireLevelJobs = [] } = await chrome.storage.local.get("pendingHireLevelJobs");
-    pendingHireLevelJobs.push(job);
-    await chrome.storage.local.set({ pendingHireLevelJobs });
-    await writeDebugLog({ type: "capture-succeeded", url: location.href, job });
-    flash(button, selectedBoard ? `Captured for ${selectedBoard.name}` : "Captured. Open tracker.", "#176c42");
+    try {
+      const stored = await safeStorageSet({ [getPendingJobKey(captureId)]: job });
+      if (!stored) throw new Error("Extension storage is unavailable. Reload the page after reloading the extension.");
+      await writeDebugLog({ type: "capture-succeeded", source: "linkedin", captureId, url: location.href, job });
+      flash(button, selectedBoard ? `Captured for ${selectedBoard.name}` : "Captured. Open tracker.", "#176c42");
+    } catch (error) {
+      await writeDebugLog({ type: "capture-storage-failed", source: "linkedin", captureId, url: location.href, message: error?.message || String(error), job });
+      flash(button, "Storage failed", "#b42318");
+    }
   }
 
   async function getBoards() {
-    const { hireLevelBoards = [] } = await chrome.storage.local.get("hireLevelBoards");
+    const { hireLevelBoards = [] } = await safeStorageGet("hireLevelBoards");
     return Array.isArray(hireLevelBoards) ? hireLevelBoards : [];
   }
 
+  async function getTheme() {
+    const { hireLevelTheme } = await safeStorageGet("hireLevelTheme");
+    return {
+      panel: hireLevelTheme?.panel || "white",
+      ink: hireLevelTheme?.ink || "#1d2433",
+      line: hireLevelTheme?.line || "#c8dfc2",
+      accent: hireLevelTheme?.accent || "#2f9b61",
+      accentDark: hireLevelTheme?.accentDark || "#176c42",
+      accentSoft: hireLevelTheme?.accentSoft || "#d8f1dd",
+      shadow: hireLevelTheme?.shadow || "0 10px 28px rgba(0,0,0,.14)",
+    };
+  }
+
+  function getSelectStyles(theme) {
+    return [
+      `border:1px solid ${theme.accentDark}`,
+      "border-radius:8px",
+      `background:${theme.panel}`,
+      `color:${theme.ink}`,
+      "width:220px",
+      "max-width:220px",
+      "height:44px",
+      "min-height:44px",
+      "line-height:20px",
+      "padding:10px 12px",
+      `box-shadow:${theme.shadow}`,
+      "box-sizing:border-box",
+      "font-size:14px",
+    ];
+  }
+
+  function createFieldLabel(text, theme) {
+    const label = document.createElement("div");
+    label.textContent = text;
+    label.style.cssText = [
+      `color:${theme.accentDark}`,
+      "font-size:12px",
+      "font-weight:800",
+      "line-height:14px",
+      "margin:2px 0 -4px",
+      "padding:0 2px",
+      "letter-spacing:0",
+    ].join(";");
+    return label;
+  }
+
+  function getSelectedInitialStatus() {
+    const status = document.getElementById(statusSelectId)?.value;
+    return status === "saved" ? "saved" : "applied";
+  }
+
   async function getPosition() {
-    const { hireLevelCapturePosition } = await chrome.storage.local.get("hireLevelCapturePosition");
+    const { hireLevelCapturePosition } = await safeStorageGet("hireLevelCapturePosition");
     if (hireLevelCapturePosition && Number.isFinite(hireLevelCapturePosition.left) && Number.isFinite(hireLevelCapturePosition.top)) {
       return {
-        left: Math.max(12, Math.min(window.innerWidth - 180, hireLevelCapturePosition.left)),
+        left: Math.max(12, Math.min(window.innerWidth - 240, hireLevelCapturePosition.left)),
         top: Math.max(12, Math.min(window.innerHeight - 90, hireLevelCapturePosition.top)),
       };
     }
-    return { left: Math.max(12, window.innerWidth - 220), top: Math.max(12, window.innerHeight - 110) };
+    return { left: Math.max(12, window.innerWidth - 250), top: Math.max(12, window.innerHeight - 130) };
   }
 
   function startDrag(event, wrapper) {
@@ -161,7 +258,7 @@
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerup", stop);
       const rect = wrapper.getBoundingClientRect();
-      await chrome.storage.local.set({ hireLevelCapturePosition: { left: rect.left, top: rect.top } });
+      await safeStorageSet({ hireLevelCapturePosition: { left: rect.left, top: rect.top } });
     };
 
     document.addEventListener("pointermove", move);
@@ -200,7 +297,8 @@
       "#job-details",
       ".jobs-description-content__text",
     ]) || inferDescriptionFromPane(detailPane);
-    return { title, company, description, url: location.href, capturedAt: new Date().toISOString(), source: "linkedin" };
+    const companyLogoUrl = inferCompanyLogoUrl(detailPane, selectedCard);
+    return { title, company, description, companyLogoUrl, url: location.href, capturedAt: new Date().toISOString(), source: "linkedin" };
   }
 
   function getSelectedJobCard() {
@@ -268,6 +366,15 @@
     return lines.slice(start + 1).filter(isLikelyDescriptionLine).join("\n");
   }
 
+  function inferCompanyLogoUrl(detailPane, selectedCard) {
+    const image =
+      detailPane?.querySelector("img[alt*='logo' i], img[class*='logo' i], img[src*='media.licdn.com']") ||
+      selectedCard?.querySelector("img[alt*='logo' i], img[class*='logo' i], img[src*='media.licdn.com']");
+    const src = image?.currentSrc || image?.src || "";
+    if (!src || src.startsWith("data:")) return "";
+    return src;
+  }
+
   function getCleanLines(element) {
     return cleanText(element?.innerText || element?.textContent || "")
       .split(/\n|(?<=\.)\s+(?=[A-Z])/)
@@ -311,10 +418,29 @@
   }
 
   async function writeDebugLog(entry) {
-    const { hireLevelDebugLog = [] } = await chrome.storage.local.get("hireLevelDebugLog");
+    const { hireLevelDebugLog = [] } = await safeStorageGet("hireLevelDebugLog");
     const nextLog = Array.isArray(hireLevelDebugLog) ? hireLevelDebugLog.slice(-24) : [];
     nextLog.push({ ...entry, at: new Date().toISOString() });
-    await chrome.storage.local.set({ hireLevelDebugLog: nextLog });
+    await safeStorageSet({ hireLevelDebugLog: nextLog });
+  }
+
+  async function safeStorageGet(keys) {
+    try {
+      if (typeof chrome === "undefined" || !chrome.runtime?.id) return {};
+      return await chrome.storage.local.get(keys);
+    } catch {
+      return {};
+    }
+  }
+
+  async function safeStorageSet(values) {
+    try {
+      if (typeof chrome === "undefined" || !chrome.runtime?.id) return false;
+      await chrome.storage.local.set(values);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function textFromSelectors(selectors) {
@@ -332,6 +458,14 @@
 
   function cleanText(text) {
     return String(text || "").replace(/\s+/g, " ").trim();
+  }
+
+  function createCaptureId() {
+    return `capture-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function getPendingJobKey(captureId) {
+    return `pendingHireLevelJob_${captureId}`;
   }
 
   function flash(button, text, color) {
