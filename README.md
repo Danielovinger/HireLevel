@@ -65,7 +65,7 @@ The current board can be reset to its default state without resetting XP. Board 
 
 ## Run Locally
 
-For non-technical users, a future Windows release can be shipped as `HireLevel-windows.zip` with:
+For non-technical users, download `HireLevel-windows.zip` from the latest GitHub Release. It contains:
 
 ```text
 HireLevel.exe
@@ -117,7 +117,6 @@ All tracker data is saved locally in your browser. Export JSON regularly if you 
 
 ## Roadmap Ideas
 
-- Optional desktop app wrapper.
 - Browser extension for one-click job capture.
 - CSV export.
 - Reminders and follow-up dates.

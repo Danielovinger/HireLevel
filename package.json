@@ -1,0 +1,14 @@
+{
+  "name": "hirelevel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HireLevel desktop packaging scripts.",
+  "scripts": {
+    "prepare:desktop": "powershell -ExecutionPolicy Bypass -File scripts/prepare-desktop.ps1",
+    "desktop:dev": "npm run prepare:desktop && tauri dev",
+    "desktop:build": "npm run prepare:desktop && tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}
