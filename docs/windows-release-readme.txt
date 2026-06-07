@@ -25,6 +25,8 @@ After installing the extension, open its details page and enable Allow access to
 
 HireLevel does not upload job data, account data, or tracking data to a cloud service. The app files open locally in your browser, and tracker data stays in that browser's local storage.
 
+For stronger protection against accidental browser-storage cleanup, open Settings -> Data Storage and create or open a local HireLevel-data.json file. Once connected, HireLevel autosaves changes to that file. If browser storage is ever cleared, open the same data file again to restore the board.
+
 Install the browser extension:
 
 1. Open Chrome or Edge.
@@ -49,4 +51,5 @@ Notes:
 - Applied jobs grant the normal 5 XP once.
 - Later application progress should be changed inside HireLevel.
 - All HireLevel data stays local on your computer.
+- A connected data file protects your board from accidental browser-storage cleanup.
 - Export JSON backups regularly if you want to move your data or keep a separate copy.

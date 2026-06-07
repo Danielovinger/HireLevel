@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.0 - 2026-06-07
+
+- Added optional Chrome/Edge local JSON data-file autosave through Settings -> Data Storage.
+- Kept browser storage as a fallback/cache while allowing users to reopen a saved data file after browser-storage cleanup.
+- Updated public docs and Windows package instructions for the new data-file workflow.
+
 ## v1.1.1 - 2026-06-07
 
 Simplified the Windows download package so HireLevel launches directly as a local HTML file.

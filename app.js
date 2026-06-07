@@ -1,5 +1,8 @@
 const STORAGE_KEY = "hirelevel-state-v2";
 const LEGACY_STORAGE_KEYS = ["hirelevel-state-v1", "open-job-tracker-state-v1"];
+const DATA_FILE_DB_NAME = "hirelevel-data-file";
+const DATA_FILE_STORE_NAME = "handles";
+const DATA_FILE_HANDLE_KEY = "primary";
 const MAX_CUSTOM_COLUMNS = 5;
 const CUSTOM_COLUMN_XP = 25;
 
@@ -53,6 +56,9 @@ let state = loadState();
 let editingJobId = null;
 let draggedJobId = null;
 let pendingConfirmAction = null;
+let dataFileHandle = null;
+let dataFileSavePromise = null;
+let dataFileSaveQueued = false;
 
 const board = document.querySelector("#board");
 const columnTemplate = document.querySelector("#columnTemplate");
@@ -84,6 +90,9 @@ document.querySelector("#resetBoardBtn").addEventListener("click", confirmResetB
 document.querySelector("#resetBoardProgressBtn").addEventListener("click", confirmResetBoardProgression);
 document.querySelector("#resetAccountProgressBtn").addEventListener("click", confirmResetAccountProgression);
 document.querySelector("#deleteBoardBtn").addEventListener("click", confirmDeleteBoard);
+document.querySelector("#createDataFileBtn").addEventListener("click", createDataFile);
+document.querySelector("#openDataFileBtn").addEventListener("click", openDataFile);
+document.querySelector("#saveDataFileBtn").addEventListener("click", saveDataFileNow);
 document.querySelector("#confirmNoBtn").addEventListener("click", () => confirmDialog.close());
 searchInput.addEventListener("input", renderApp);
 
@@ -168,6 +177,7 @@ confirmForm.addEventListener("submit", (event) => {
 });
 
 renderApp();
+initializeDataFile();
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY) || LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
@@ -222,9 +232,11 @@ function migrateState(parsed) {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  queueDataFileSave();
   syncExtensionBoardList();
   const status = document.querySelector("#storageStatus");
   if (status) status.textContent = `Saved locally at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  renderDataFileSettings();
 }
 
 function renderApp() {
@@ -300,6 +312,263 @@ function renderSettings() {
   document.querySelector("#boardNameInput").value = activeBoard.name;
   document.querySelector("#customColumnCount").textContent = `Custom columns: ${getCustomColumns(activeBoard).length} / ${MAX_CUSTOM_COLUMNS}`;
   document.querySelector("#deleteBoardBtn").disabled = state.boards.length <= 1;
+  renderDataFileSettings();
+}
+
+function renderDataFileSettings(message = "") {
+  const status = document.querySelector("#dataFileStatus");
+  const createButton = document.querySelector("#createDataFileBtn");
+  const openButton = document.querySelector("#openDataFileBtn");
+  const saveButton = document.querySelector("#saveDataFileBtn");
+  if (!status || !createButton || !openButton || !saveButton) return;
+
+  const supported = supportsFileSystemAccess();
+  createButton.disabled = !supported;
+  openButton.disabled = !supported;
+  saveButton.disabled = !supported || !dataFileHandle;
+
+  if (!supported) {
+    status.textContent = "Data files are not supported in this browser. Export JSON backups regularly.";
+    return;
+  }
+
+  if (message) {
+    status.textContent = message;
+    return;
+  }
+
+  status.textContent = dataFileHandle
+    ? `Connected data file: ${dataFileHandle.name}. Changes autosave to this file.`
+    : "Saving to browser storage. Connect a JSON data file for safer local persistence.";
+}
+
+function supportsFileSystemAccess() {
+  return Boolean(window.showOpenFilePicker && window.showSaveFilePicker && window.indexedDB);
+}
+
+async function initializeDataFile() {
+  if (!supportsFileSystemAccess()) {
+    renderDataFileSettings();
+    return;
+  }
+
+  try {
+    const handle = await getStoredDataFileHandle();
+    if (!handle) {
+      renderDataFileSettings();
+      return;
+    }
+
+    dataFileHandle = handle;
+    const hasPermission = await verifyFilePermission(dataFileHandle, false);
+    if (!hasPermission) {
+      renderDataFileSettings(`Data file remembered: ${dataFileHandle.name}. Click Save Now to restore permission.`);
+      return;
+    }
+
+    const loadedState = await readStateFromDataFile(dataFileHandle);
+    if (loadedState) {
+      state = loadedState;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      renderApp();
+      renderDataFileSettings(`Loaded data file: ${dataFileHandle.name}. Changes autosave to this file.`);
+    }
+  } catch (error) {
+    console.warn("Could not initialize HireLevel data file", error);
+    renderDataFileSettings("The remembered data file could not be opened. Browser storage is still available.");
+  }
+}
+
+async function createDataFile() {
+  if (!supportsFileSystemAccess()) {
+    alert("Data files are supported in Chrome and Edge. Use Export JSON backups in this browser.");
+    return;
+  }
+
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: "HireLevel-data.json",
+      types: [
+        {
+          description: "HireLevel JSON data",
+          accept: { "application/json": [".json"] },
+        },
+      ],
+    });
+    dataFileHandle = handle;
+    if (!(await verifyFilePermission(dataFileHandle, true))) {
+      dataFileHandle = null;
+      renderDataFileSettings("Data file permission was not granted. Browser storage is still available.");
+      return;
+    }
+    await saveStoredDataFileHandle(dataFileHandle);
+    await writeStateToDataFile(dataFileHandle);
+    renderDataFileSettings(`Created data file: ${dataFileHandle.name}. Changes autosave to this file.`);
+  } catch (error) {
+    if (error?.name !== "AbortError") {
+      console.warn("Could not create HireLevel data file", error);
+      alert("HireLevel could not create that data file. Try another folder or file name.");
+    }
+  }
+}
+
+async function openDataFile() {
+  if (!supportsFileSystemAccess()) {
+    alert("Data files are supported in Chrome and Edge. Use Import JSON in this browser.");
+    return;
+  }
+
+  if (!confirm("Open this data file and replace the current board with its saved contents?")) return;
+
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      multiple: false,
+      types: [
+        {
+          description: "HireLevel JSON data",
+          accept: { "application/json": [".json"] },
+        },
+      ],
+    });
+    if (!(await verifyFilePermission(handle, true))) {
+      renderDataFileSettings("Data file permission was not granted. Browser storage is still available.");
+      return;
+    }
+    const loadedState = await readStateFromDataFile(handle);
+    if (!loadedState) {
+      alert("That file does not look like a HireLevel data file.");
+      return;
+    }
+
+    dataFileHandle = handle;
+    await saveStoredDataFileHandle(dataFileHandle);
+    state = loadedState;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    renderApp();
+    renderDataFileSettings(`Opened data file: ${dataFileHandle.name}. Changes autosave to this file.`);
+    syncExtensionBoardList();
+  } catch (error) {
+    if (error?.name !== "AbortError") {
+      console.warn("Could not open HireLevel data file", error);
+      alert("HireLevel could not open that data file.");
+    }
+  }
+}
+
+async function saveDataFileNow() {
+  if (!supportsFileSystemAccess()) {
+    alert("Data files are supported in Chrome and Edge. Use Export JSON backups in this browser.");
+    return;
+  }
+
+  if (!dataFileHandle) {
+    await createDataFile();
+    return;
+  }
+
+  try {
+    if (!(await verifyFilePermission(dataFileHandle, true))) {
+      renderDataFileSettings(`Data file permission was not granted for ${dataFileHandle.name}.`);
+      return;
+    }
+    await writeStateToDataFile(dataFileHandle);
+    await saveStoredDataFileHandle(dataFileHandle);
+    renderDataFileSettings(`Saved data file: ${dataFileHandle.name}.`);
+  } catch (error) {
+    console.warn("Could not save HireLevel data file", error);
+    alert("HireLevel could not save the connected data file. Try reconnecting it.");
+  }
+}
+
+function queueDataFileSave() {
+  if (!dataFileHandle || !supportsFileSystemAccess()) return;
+  if (dataFileSavePromise) {
+    dataFileSaveQueued = true;
+    return;
+  }
+
+  dataFileSavePromise = autosaveDataFile()
+    .catch((error) => {
+      console.warn("Could not autosave HireLevel data file", error);
+      renderDataFileSettings(`Data file needs permission before autosave can continue: ${dataFileHandle.name}.`);
+    })
+    .finally(() => {
+      dataFileSavePromise = null;
+      if (dataFileSaveQueued) {
+        dataFileSaveQueued = false;
+        queueDataFileSave();
+      }
+    });
+}
+
+async function autosaveDataFile() {
+  const hasPermission = await verifyFilePermission(dataFileHandle, false);
+  if (!hasPermission) {
+    renderDataFileSettings(`Data file remembered: ${dataFileHandle.name}. Click Save Now to restore permission.`);
+    return;
+  }
+  await writeStateToDataFile(dataFileHandle);
+  const status = document.querySelector("#storageStatus");
+  if (status) status.textContent = `Saved to data file at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+async function readStateFromDataFile(handle) {
+  const file = await handle.getFile();
+  const text = (await file.text()).trim();
+  if (!text) return null;
+  return migrateState(JSON.parse(text));
+}
+
+async function writeStateToDataFile(handle) {
+  const writable = await handle.createWritable();
+  await writable.write(JSON.stringify(state, null, 2));
+  await writable.close();
+}
+
+async function verifyFilePermission(handle, shouldPrompt) {
+  const options = { mode: "readwrite" };
+  if ((await handle.queryPermission(options)) === "granted") return true;
+  if (!shouldPrompt) return false;
+  return (await handle.requestPermission(options)) === "granted";
+}
+
+function openDataFileDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DATA_FILE_DB_NAME, 1);
+    request.addEventListener("upgradeneeded", () => {
+      request.result.createObjectStore(DATA_FILE_STORE_NAME);
+    });
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error));
+  });
+}
+
+async function getStoredDataFileHandle() {
+  const db = await openDataFileDb();
+  return readFromStore(db, DATA_FILE_HANDLE_KEY);
+}
+
+async function saveStoredDataFileHandle(handle) {
+  const db = await openDataFileDb();
+  await writeToStore(db, DATA_FILE_HANDLE_KEY, handle);
+}
+
+function readFromStore(db, key) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(DATA_FILE_STORE_NAME, "readonly");
+    const request = transaction.objectStore(DATA_FILE_STORE_NAME).get(key);
+    request.addEventListener("success", () => resolve(request.result || null));
+    request.addEventListener("error", () => reject(request.error));
+  });
+}
+
+function writeToStore(db, key, value) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(DATA_FILE_STORE_NAME, "readwrite");
+    transaction.objectStore(DATA_FILE_STORE_NAME).put(value, key);
+    transaction.addEventListener("complete", () => resolve());
+    transaction.addEventListener("error", () => reject(transaction.error));
+  });
 }
 
 function renderLevelPanel() {

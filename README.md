@@ -18,6 +18,7 @@ HireLevel is a small offline-first job application board for organizing job-sear
 - Add custom columns.
 - Drag jobs between columns or change status from an expanded card.
 - Expand cards to see the full description, notes, edit/delete actions, status selector, and original job link.
+- Optional local JSON data file with autosave in Chrome/Edge.
 - Local JSON export and import for backups.
 - No backend, login, analytics, or external package dependencies.
 
@@ -84,6 +85,8 @@ The packaged app opens as a local `file://` page. For the extension to sync capt
 
 HireLevel does not upload job data, account data, or tracking data to a cloud service. The app files open locally in the browser, and tracker data stays in that browser's local storage.
 
+For stronger protection against accidental browser-storage cleanup, open **Settings -> Data Storage** and create or open a local `HireLevel-data.json` file. Once connected, HireLevel autosaves changes to that file. If browser storage is ever cleared, open the same data file again to restore the board.
+
 For source users and developers:
 
 Open `index.html` directly in your browser.
@@ -120,9 +123,9 @@ For the packaged Windows download, open `HireLevel.html` first, then enable **Al
 
 After pulling updates, click the extension reload button in `chrome://extensions` or `edge://extensions`, then refresh any open LinkedIn and HireLevel tabs.
 
-## Privacy
+## Privacy And Data Safety
 
-All tracker data is saved locally in your browser. Export JSON regularly if you want a portable backup or want to move the board to another browser or machine.
+Tracker data is saved locally. By default, HireLevel uses browser storage. In Chrome/Edge, the optional Data Storage setting can also autosave to a local JSON file chosen by the user. Export JSON regularly if you want an extra portable backup or want to move the board to another browser or machine.
 
 ## Roadmap Ideas
 
