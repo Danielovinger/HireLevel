@@ -2,7 +2,7 @@
 
 HireLevel - level up your job search. An offline job application tracker with XP, levels, zero cloud nonsense, and absolutely free to use.
 
-HireLevel is a small offline-first job application board for organizing job-search progress without accounts, servers, or cloud storage. Download the Windows ZIP and launch it with `Start HireLevel.cmd`, or open `index.html` directly when working from the source code. Your data is stored locally in that browser with `localStorage`.
+HireLevel is a small offline-first job application board for organizing job-search progress without accounts, servers, or cloud storage. Download the Windows ZIP and launch it by double-clicking `HireLevel.html`, or open `index.html` directly when working from the source code. Your data is stored locally in that browser with `localStorage`.
 
 ## Features
 
@@ -69,20 +69,20 @@ The current board can be reset to its default state without resetting XP. Board 
 For non-technical users, download `HireLevel-windows.zip` from the latest GitHub Release. It contains:
 
 ```text
-Start HireLevel.cmd
+HireLevel.html
+app.js
+styles.css
 extension/
-app/
-scripts/
 windows-release-readme.txt
 ```
 
-That download lets users launch the app by double-clicking `Start HireLevel.cmd`, which opens HireLevel in their browser at `http://127.0.0.1:8765`. `127.0.0.1` is the standard local loopback address, meaning it points to the user's own computer, not to your PC or a public network server. Running in a real browser lets the Chrome/Edge extension sync captured jobs into the tracker. The ZIP instructions are maintained in `docs/windows-release-readme.txt`.
+That download lets users launch the app by double-clicking `HireLevel.html`. The ZIP instructions are maintained in `docs/windows-release-readme.txt`.
 
 ## Please Notice
 
-Windows may show an **Open File - Security Warning** when `Start HireLevel.cmd` is launched from a downloaded ZIP. That warning appears because the launcher is a local command script from an open-source project, not a signed commercial installer. If the ZIP was downloaded from the official HireLevel GitHub release, click **Run** to start the local app server.
+The packaged app opens as a local `file://` page. For the extension to sync captured jobs into HireLevel, Chrome or Edge must allow the extension to access local files. In the extension details page, enable **Allow access to file URLs**.
 
-HireLevel only serves files from the downloaded folder to the user's own browser through `127.0.0.1`. It does not upload job data, account data, or tracking data to a cloud service.
+HireLevel does not upload job data, account data, or tracking data to a cloud service. The app files open locally in the browser, and tracker data stays in that browser's local storage.
 
 For source users and developers:
 
@@ -116,7 +116,7 @@ Automatic extension capture currently supports:
 
 Other job boards can still be tracked manually with URL entry and pasted job text.
 
-If you open the tracker through `file://`, enable **Allow access to file URLs** for the extension in the browser's extension details page. For the packaged Windows download, use `Start HireLevel.cmd` so the tracker runs on `127.0.0.1`, which is usually smoother for extension syncing.
+For the packaged Windows download, open `HireLevel.html` first, then enable **Allow access to file URLs** for the extension in the browser's extension details page. This lets the extension sync supported LinkedIn and Glassdoor captures into the local tracker.
 
 After pulling updates, click the extension reload button in `chrome://extensions` or `edge://extensions`, then refresh any open LinkedIn and HireLevel tabs.
 

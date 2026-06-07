@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.1 - 2026-06-07
+
+Simplified the Windows download package so HireLevel launches directly as a local HTML file.
+
+- Removed the CMD/local-server launcher from the source tree and Windows ZIP.
+- Packaged the user entry point as `HireLevel.html`.
+- Updated Windows instructions around the required extension setting: **Allow access to file URLs**.
+- Kept `index.html` as the normal source entry point for developers.
+- Bumped the app and extension version to 1.1.1.
+
 ## v1.1.0 - 2026-06-07
 
 Polished the public documentation and Windows download package.

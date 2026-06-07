@@ -6,26 +6,24 @@ This folder is for people who want to use HireLevel without opening the source c
 
 Included files:
 
-- Start HireLevel.cmd
+- HireLevel.html
+- app.js
+- styles.css
 - extension/
-- app/
-- scripts/
 - windows-release-readme.txt
 
 Start the app:
 
-1. Double-click Start HireLevel.cmd.
-2. Your browser will open HireLevel at http://127.0.0.1:8765.
-3. Keep the small command window open while using HireLevel.
-4. Close that command window when you want to stop HireLevel.
-
-127.0.0.1 is the standard local address for this same computer. It does not point to the developer's computer, your home network, or the public internet.
+1. Double-click HireLevel.html.
+2. Your browser will open the HireLevel app.
 
 Please Notice:
 
-Windows may show an Open File - Security Warning when Start HireLevel.cmd is launched from a downloaded ZIP. That warning appears because the launcher is a local command script from an open-source project, not a signed commercial installer. If this ZIP was downloaded from the official HireLevel GitHub release, click Run to start HireLevel.
+The app opens as a local file. For the extension to sync captured jobs into HireLevel, Chrome or Edge must allow the extension to access local files.
 
-HireLevel only serves files from this folder to your own browser through 127.0.0.1. It does not upload job data, account data, or tracking data to a cloud service.
+After installing the extension, open its details page and enable Allow access to file URLs.
+
+HireLevel does not upload job data, account data, or tracking data to a cloud service. The app files open locally in your browser, and tracker data stays in that browser's local storage.
 
 Install the browser extension:
 
@@ -34,10 +32,12 @@ Install the browser extension:
 3. Turn on Developer mode.
 4. Click Load unpacked.
 5. Select the extension folder included with this download.
+6. Open the HireLevel Capture extension details page.
+7. Enable Allow access to file URLs.
 
 Use the extension:
 
-1. Start HireLevel with Start HireLevel.cmd so the extension can learn your boards.
+1. Open HireLevel.html so the extension can learn your boards.
 2. Open a supported job page on LinkedIn or Glassdoor.
 3. Choose the board.
 4. Choose whether to add the job as Applied or Saved Jobs.
