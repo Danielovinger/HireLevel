@@ -68,12 +68,16 @@ The current board can be reset to its default state without resetting XP. Board 
 For non-technical users, download `HireLevel-windows.zip` from the latest GitHub Release. It contains:
 
 ```text
-HireLevel.exe
+Start HireLevel.cmd
+index.html
+app.js
+styles.css
 extension/
+scripts/
 windows-release-readme.txt
 ```
 
-That download lets users launch the app by double-clicking `HireLevel.exe`, while the source code remains available in this repository. The ZIP instructions are maintained in `docs/windows-release-readme.txt`.
+That download lets users launch the app by double-clicking `Start HireLevel.cmd`, which opens HireLevel in their browser at `http://127.0.0.1:8765`. Running in a real browser lets the Chrome/Edge extension sync captured jobs into the tracker. The ZIP instructions are maintained in `docs/windows-release-readme.txt`.
 
 For source users and developers:
 

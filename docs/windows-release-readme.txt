@@ -6,14 +6,20 @@ This folder is for people who want to use HireLevel without opening the source c
 
 Included files:
 
-- HireLevel.exe
+- Start HireLevel.cmd
+- index.html
+- app.js
+- styles.css
 - extension/
+- scripts/
 - windows-release-readme.txt
 
 Start the app:
 
-1. Double-click HireLevel.exe.
-2. Keep the app open while capturing jobs from the browser extension.
+1. Double-click Start HireLevel.cmd.
+2. Your browser will open HireLevel at http://127.0.0.1:8765.
+3. Keep the small command window open while using HireLevel.
+4. Close that command window when you want to stop HireLevel.
 
 Install the browser extension:
 
@@ -25,7 +31,7 @@ Install the browser extension:
 
 Use the extension:
 
-1. Open HireLevel.exe at least once so the extension can learn your boards.
+1. Start HireLevel with Start HireLevel.cmd so the extension can learn your boards.
 2. Open a supported job page on LinkedIn or Glassdoor.
 3. Choose the board.
 4. Choose whether to add the job as Applied or Saved Jobs.

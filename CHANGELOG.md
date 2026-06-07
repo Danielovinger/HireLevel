@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.1 - 2026-06-07
+
+Fixed the Windows download package so extension captures work with the launched tracker.
+
+- Replaced the unsupported desktop WebView package with a browser launcher package.
+- Added `Start HireLevel.cmd`, which starts HireLevel on localhost and opens it in the user's browser.
+- Kept extension capture compatible by running the tracker in Chrome/Edge-compatible browser context.
+- Removed the Tauri desktop packaging scaffold from the source tree.
+
 ## v1.0.0 - 2026-06-06
 
 First stable HireLevel release.
@@ -13,7 +22,7 @@ First stable HireLevel release.
 - Updated the XP curve so 25 XP actions remain useful through level 100 while level 200 stays offer-driven.
 - Added extension widget board/status selectors with session memory for repeated captures.
 - Fixed board deletion so global XP remains account history while per-board XP can be removed with the board.
-- Added Tauri desktop packaging and Windows ZIP release instructions.
+- Added Windows ZIP launcher instructions for running HireLevel in a real browser with extension support.
 - Documented the two-phase XP curve, supported job-board capture flow, and Windows ZIP usage.
 
 ## v0.1.2 - 2026-06-05

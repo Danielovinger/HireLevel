@@ -1,5 +1,1 @@
-node_modules/
-desktop-dist/
 release/
-src-tauri/gen/
-src-tauri/target/
