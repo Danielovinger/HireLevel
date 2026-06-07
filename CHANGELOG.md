@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.1.0 - 2026-06-07
+
+Polished the public documentation and Windows download package.
+
+- Cleaned up README wording so it reflects the current extension-supported LinkedIn and Glassdoor capture flow.
+- Added a Windows security-warning notice for `Start HireLevel.cmd`.
+- Moved packaged app files into an `app/` folder so the ZIP has one obvious launcher.
+- Added a Windows package build script for repeatable release ZIP creation.
+- Updated in-app fallback copy for blocked manual job-page reads.
+- Bumped the app and extension version to 1.1.0.
+
 ## v1.0.1 - 2026-06-07
 
 Fixed the Windows download package so extension captures work with the launched tracker.

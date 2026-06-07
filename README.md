@@ -2,13 +2,13 @@
 
 HireLevel - level up your job search. An offline job application tracker with XP, levels, zero cloud nonsense, and absolutely free to use.
 
-HireLevel is a small offline-first job application board for organizing job-search progress without accounts, servers, or cloud storage. Open `index.html` in a browser and your data is stored locally in that browser with `localStorage`.
+HireLevel is a small offline-first job application board for organizing job-search progress without accounts, servers, or cloud storage. Download the Windows ZIP and launch it with `Start HireLevel.cmd`, or open `index.html` directly when working from the source code. Your data is stored locally in that browser with `localStorage`.
 
 ## Features
 
 - Add a job from a manually entered URL.
 - Best-effort metadata fetching for job title, company, and description when the job page allows local browser reads.
-- URL fallback heuristics when a job site blocks local scraping.
+- Browser extension capture for supported logged-in job boards, including LinkedIn and Glassdoor.
 - Paste-and-parse fallback for blocked job pages.
 - Application XP, levels, progress meter, and title ranks.
 - Multiple job-search boards.
@@ -21,13 +21,14 @@ HireLevel is a small offline-first job application board for organizing job-sear
 - Local JSON export and import for backups.
 - No backend, login, analytics, or external package dependencies.
 
-## Browser Limitations
+## Job Capture
 
-Because this project is intentionally local and has no backend scraper, many job sites will block automatic page reading with CORS rules. When that happens, the app fills what it can from the URL and leaves the fields editable so you can paste the missing title, company, or description.
+HireLevel has two capture paths:
 
-LinkedIn is usually blocked from direct local scraping because the job details are rendered inside a logged-in browser session and the page does not allow another local page to read it. For LinkedIn jobs, open the job, copy the visible job details panel text, paste it into **Paste job page text**, and click **Parse Pasted Text**.
+- Use the included Chrome/Edge extension for supported job boards such as LinkedIn and Glassdoor. The extension reads the job details from the page you are already viewing, then sends the captured job to your local HireLevel board.
+- Use the app's manual URL form for other job sites. If a page blocks direct local reading with CORS rules, HireLevel fills what it can from the URL and leaves the fields editable so you can paste the missing title, company, or description.
 
-Company icons are loaded from the job site's `/favicon.ico` when available. If you are offline or the favicon cannot load, the card falls back to company initials.
+Company icons are captured by the extension when the job board exposes them. For manual URL entries, HireLevel tries the job site's `/favicon.ico` when available. If you are offline or the icon cannot load, the card falls back to company initials.
 
 ## XP Rules
 
@@ -63,21 +64,25 @@ The Settings tab lets you choose whether XP is shown as:
 
 The current board can be reset to its default state without resetting XP. Board progression can also be reset separately. Account progression reset is only available from Settings.
 
-## Run Locally
+## Use HireLevel
 
 For non-technical users, download `HireLevel-windows.zip` from the latest GitHub Release. It contains:
 
 ```text
 Start HireLevel.cmd
-index.html
-app.js
-styles.css
 extension/
+app/
 scripts/
 windows-release-readme.txt
 ```
 
-That download lets users launch the app by double-clicking `Start HireLevel.cmd`, which opens HireLevel in their browser at `http://127.0.0.1:8765`. Running in a real browser lets the Chrome/Edge extension sync captured jobs into the tracker. The ZIP instructions are maintained in `docs/windows-release-readme.txt`.
+That download lets users launch the app by double-clicking `Start HireLevel.cmd`, which opens HireLevel in their browser at `http://127.0.0.1:8765`. `127.0.0.1` is the standard local loopback address, meaning it points to the user's own computer, not to your PC or a public network server. Running in a real browser lets the Chrome/Edge extension sync captured jobs into the tracker. The ZIP instructions are maintained in `docs/windows-release-readme.txt`.
+
+## Please Notice
+
+Windows may show an **Open File - Security Warning** when `Start HireLevel.cmd` is launched from a downloaded ZIP. That warning appears because the launcher is a local command script from an open-source project, not a signed commercial installer. If the ZIP was downloaded from the official HireLevel GitHub release, click **Run** to start the local app server.
+
+HireLevel only serves files from the downloaded folder to the user's own browser through `127.0.0.1`. It does not upload job data, account data, or tracking data to a cloud service.
 
 For source users and developers:
 
@@ -111,7 +116,7 @@ Automatic extension capture currently supports:
 
 Other job boards can still be tracked manually with URL entry and pasted job text.
 
-If you open the tracker through `file://`, enable **Allow access to file URLs** for the extension in the browser's extension details page. Alternatively, run the tracker on `localhost`, which is usually smoother for extension testing.
+If you open the tracker through `file://`, enable **Allow access to file URLs** for the extension in the browser's extension details page. For the packaged Windows download, use `Start HireLevel.cmd` so the tracker runs on `127.0.0.1`, which is usually smoother for extension syncing.
 
 After pulling updates, click the extension reload button in `chrome://extensions` or `edge://extensions`, then refresh any open LinkedIn and HireLevel tabs.
 
@@ -119,7 +124,13 @@ After pulling updates, click the extension reload button in `chrome://extensions
 
 All tracker data is saved locally in your browser. Export JSON regularly if you want a portable backup or want to move the board to another browser or machine.
 
+## Roadmap Ideas
+
+- CSV export.
+- Reminders and follow-up dates.
+- Archive view.
+- Better company logo handling.
 
 ## License
 
-MIT for this small open source app.
+HireLevel is released under the MIT License. See `LICENSE` for details.

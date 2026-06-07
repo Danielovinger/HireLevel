@@ -1,6 +1,11 @@
 $ErrorActionPreference = "Stop"
 
-$root = Resolve-Path (Join-Path $PSScriptRoot "..")
+$packageRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$packagedAppRoot = Join-Path $packageRoot "app"
+$root = $packageRoot
+if (Test-Path (Join-Path $packagedAppRoot "index.html") -PathType Leaf) {
+  $root = Resolve-Path $packagedAppRoot
+}
 $port = 8765
 $prefix = "http://127.0.0.1:$port/"
 $listener = New-Object System.Net.HttpListener

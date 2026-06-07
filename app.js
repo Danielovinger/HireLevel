@@ -606,14 +606,14 @@ async function fetchJobDetails() {
     descriptionInput.value = metadata.description || descriptionInput.value;
     fetchMessage.textContent = "Details fetched. Review them before saving.";
   } catch {
-    fetchMessage.textContent = "The page blocked local reading. For LinkedIn, copy the visible job panel text, paste it below, and use Parse Pasted Text.";
+    fetchMessage.textContent = "The page blocked local reading. Use the extension for supported boards like LinkedIn or Glassdoor, or paste the visible job details below and use Parse Pasted Text.";
   }
 }
 
 function parsePastedText() {
   const parsed = parseJobPageText(document.querySelector("#jobPageText").value);
   if (!parsed.title && !parsed.company && !parsed.description) {
-    fetchMessage.textContent = "I could not find job details in that pasted text. Try copying only the job details panel.";
+    fetchMessage.textContent = "No job details were found in that pasted text. Try copying only the job details panel.";
     return;
   }
   document.querySelector("#jobTitle").value = parsed.title || document.querySelector("#jobTitle").value;
