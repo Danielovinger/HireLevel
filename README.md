@@ -119,14 +119,7 @@ After pulling updates, click the extension reload button in `chrome://extensions
 
 All tracker data is saved locally in your browser. Export JSON regularly if you want a portable backup or want to move the board to another browser or machine.
 
-## Roadmap Ideas
-
-- Browser extension for one-click job capture.
-- CSV export.
-- Reminders and follow-up dates.
-- Archive view.
-- Better company logo handling.
 
 ## License
 
-Add the license you prefer before publishing. MIT is a common choice for small open source apps.
+MIT for this small open source app.
