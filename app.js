@@ -253,6 +253,7 @@ function renderBoard() {
   board.innerHTML = "";
   const activeBoard = getActiveBoard();
   const query = searchInput.value.trim().toLowerCase();
+  board.style.setProperty("--column-count", activeBoard.columns.length);
   document.querySelector("#activeBoardTitle").textContent = activeBoard.name;
 
   activeBoard.columns.forEach((column) => {
@@ -913,11 +914,119 @@ function extractJobMetadata(doc, url) {
     .map((script) => safeJson(script.textContent))
     .flatMap((item) => (Array.isArray(item) ? item : [item]))
     .find((item) => item && (item["@type"] === "JobPosting" || item.title));
+  const visible = extractVisibleJobMetadata(doc, url);
+  const fallbackTitle = cleanJobTitle(getMeta(doc, "og:title") || doc.querySelector("title")?.textContent || titleFromUrl(url));
   return {
-    title: cleanText(jsonLd?.title || getMeta(doc, "og:title") || doc.querySelector("title")?.textContent || ""),
-    company: cleanText(jsonLd?.hiringOrganization?.name || getMeta(doc, "og:site_name") || companyFromUrl(url)),
-    description: cleanText(stripHtml(jsonLd?.description || "") || getMeta(doc, "description") || getMeta(doc, "og:description") || ""),
+    title: cleanText(jsonLd?.title || visible.title || fallbackTitle),
+    company: cleanText(jsonLd?.hiringOrganization?.name || visible.company || getMeta(doc, "og:site_name") || companyFromUrl(url)),
+    description: cleanText(stripHtml(jsonLd?.description || "") || visible.description || getMeta(doc, "description") || getMeta(doc, "og:description") || ""),
   };
+}
+
+function extractVisibleJobMetadata(doc, url) {
+  const title = cleanJobTitle(
+    getFirstUsefulText(doc, ["main h1", "article h1", "h1", "[class*='job'] h1", "[class*='position'] h1"]) || titleFromUrl(url)
+  );
+  const description = extractDescriptionFromDocument(doc);
+  return {
+    title,
+    company: companyFromUrl(url),
+    description,
+  };
+}
+
+function getFirstUsefulText(doc, selectors) {
+  for (const selector of selectors) {
+    const text = [...doc.querySelectorAll(selector)].map((node) => cleanText(node.textContent)).find((item) => item && isLikelyHeadingLine(item));
+    if (text) return text;
+  }
+  return "";
+}
+
+function extractDescriptionFromDocument(doc) {
+  const heading = findSectionHeading(doc, [
+    "About The Position",
+    "About the position",
+    "About the job",
+    "Job description",
+    "Responsibilities",
+    "Requirements",
+    "What you'll do",
+    "What you will do",
+  ]);
+
+  if (heading) {
+    const lines = [];
+    let node = heading.nextElementSibling;
+    while (node && lines.length < 80) {
+      const headingTag = /^H[1-4]$/i.test(node.tagName);
+      const text = cleanText(node.textContent);
+      if (headingTag && lines.length && !isContinuationDescriptionHeading(text)) break;
+      if (text && isLikelyDescriptionLine(text)) lines.push(text);
+      node = node.nextElementSibling;
+    }
+
+    const siblingDescription = lines.join("\n");
+    if (siblingDescription.length > 80) return siblingDescription;
+  }
+
+  return extractDescriptionFromTextFlow(doc);
+}
+
+function extractDescriptionFromTextFlow(doc) {
+  const root = doc.querySelector("main, article, [role='main'], [class*='job'], [class*='position']") || doc.body;
+  if (!root) return "";
+
+  const nodes = [...root.querySelectorAll("h1, h2, h3, h4, p, li")];
+  const lines = nodes.map((node) => cleanText(node.textContent)).filter(Boolean);
+  const startIndex = findMarkerIndex(lines, [
+    "About The Position",
+    "About the position",
+    "About the job",
+    "Job description",
+    "Responsibilities",
+    "Requirements",
+    "What you'll do",
+    "What you will do",
+  ]);
+  if (startIndex < 0) return "";
+
+  const descriptionLines = [];
+  for (const line of lines.slice(startIndex + 1)) {
+    if (isDescriptionEndLine(line)) break;
+    if (isLikelyDescriptionLine(line)) descriptionLines.push(line);
+    if (descriptionLines.length >= 100) break;
+  }
+
+  return descriptionLines.join("\n");
+}
+
+function findSectionHeading(doc, labels) {
+  const normalizedLabels = labels.map((label) => label.toLowerCase());
+  return [...doc.querySelectorAll("h1, h2, h3, h4, strong, b")]
+    .find((node) => normalizedLabels.includes(cleanText(node.textContent).toLowerCase()));
+}
+
+function isContinuationDescriptionHeading(text) {
+  return ["requirements", "responsibilities", "what you'll do", "what you will do"].includes(cleanText(text).toLowerCase());
+}
+
+function isDescriptionEndLine(line) {
+  const lower = cleanText(line).toLowerCase();
+  return (
+    lower === "apply for this position" ||
+    lower === "apply now" ||
+    lower === "submit application" ||
+    lower === "first name*" ||
+    lower === "last name*" ||
+    lower === "email*" ||
+    lower === "privacy policy" ||
+    lower.startsWith("linkedin") ||
+    lower.startsWith("twitter") ||
+    lower.startsWith("facebook") ||
+    lower.startsWith("newsletter") ||
+    lower.includes("all rights reserved")
+  );
 }
 
 function moveJob(jobId, status, beforeJobId = null) {
@@ -991,7 +1100,10 @@ function awardXpForColumn(boardId, jobId, columnId) {
   if (xp <= 0) return 0;
   const alreadyEarned = state.xpEvents.some((event) => event.boardId === boardId && event.jobId === jobId && event.columnId === columnId);
   if (alreadyEarned) return 0;
+  const previousLevel = calculateLevel(calculateVisibleXp()).level;
   state.xpEvents.push(createXpEvent(boardId, jobId, columnId, xp));
+  const nextLevel = calculateLevel(calculateVisibleXp()).level;
+  if (nextLevel > previousLevel) showLevelUpConfetti(nextLevel - previousLevel);
   return xp;
 }
 
@@ -1003,6 +1115,29 @@ function showXpToast(job, xp) {
   showXpToast.timeoutId = window.setTimeout(() => {
     toast.hidden = true;
   }, 2600);
+}
+
+function showLevelUpConfetti(levelsGained) {
+  const strength = Math.min(1600, Math.max(60, levelsGained * 60));
+  const layer = document.createElement("div");
+  layer.className = "confetti-layer";
+  layer.setAttribute("aria-hidden", "true");
+
+  const colors = ["#2f9b61", "#8fcea3", "#ffd166", "#ef476f", "#348ac7", "#7b68c7"];
+  for (let index = 0; index < strength; index += 1) {
+    const piece = document.createElement("span");
+    piece.className = "confetti-piece";
+    piece.style.setProperty("--x", `${Math.random() * 100}vw`);
+    piece.style.setProperty("--delay", `${Math.random() * 0.55}s`);
+    piece.style.setProperty("--duration", `${1.8 + Math.random() * 1.4}s`);
+    piece.style.setProperty("--drift", `${Math.random() * 220 - 110}px`);
+    piece.style.setProperty("--spin", `${Math.random() * 720 - 360}deg`);
+    piece.style.background = colors[index % colors.length];
+    layer.appendChild(piece);
+  }
+
+  document.body.appendChild(layer);
+  window.setTimeout(() => layer.remove(), 3800);
 }
 
 function createXpEvent(boardId, jobId, columnId, xp) {
@@ -1216,6 +1351,13 @@ function cleanText(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
 
+function cleanJobTitle(text) {
+  return cleanText(text)
+    .replace(/^job\s+opportunity:\s*/i, "")
+    .replace(/\s+[-|]\s+(careers|jobs|job opportunity).*$/i, "")
+    .trim();
+}
+
 function cleanCompanyLine(line) {
   return cleanText(line.split(" · ")[0].split(" | ")[0]);
 }
@@ -1242,15 +1384,33 @@ function companyFromUrl(url) {
 
 function titleFromUrl(url) {
   try {
-    const path = new URL(url).pathname.split("/").filter(Boolean).pop() || "";
-    return titleCase(path.replace(/\.(html|php|aspx)$/i, "").replace(/[-_+]/g, " "));
+    const ignoredSegments = new Set(["all", "apply", "jobs", "job", "careers", "career", "co", "remote", "position", "positions", "openings"]);
+    const segments = new URL(url).pathname
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment).replace(/\.(html|php|aspx)$/i, ""))
+      .filter((segment) => segment && !ignoredSegments.has(segment.toLowerCase()) && !/^[A-Z]{1,4}\.\d+$/i.test(segment));
+    const best = [...segments].reverse().find((segment) => /[-_+]/.test(segment)) || segments.at(-1) || "";
+    return titleCase(best.replace(/[-_+]/g, " "));
   } catch {
     return "";
   }
 }
 
 function titleCase(text) {
-  return cleanText(text).split(" ").filter(Boolean).map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+  const specialWords = new Map([
+    ["ai", "AI"],
+    ["api", "API"],
+    ["qa", "QA"],
+    ["ui", "UI"],
+    ["ux", "UX"],
+    ["liveops", "LiveOps"],
+  ]);
+  return cleanText(text)
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => specialWords.get(word.toLowerCase()) || word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function slugify(text, columns, ensureUnique = false) {

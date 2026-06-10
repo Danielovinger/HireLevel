@@ -385,8 +385,7 @@ textarea {
 
 .board {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(290px, 320px);
+  grid-template-columns: repeat(var(--column-count, 1), minmax(290px, 1fr));
   align-items: start;
   gap: 12px;
   height: calc(100vh - 146px);
@@ -658,6 +657,36 @@ label {
   color: var(--accent-dark);
   box-shadow: var(--shadow);
   font-weight: 700;
+}
+
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -18px;
+  left: var(--x);
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0.95;
+  animation: confetti-fall var(--duration) cubic-bezier(0.16, 0.78, 0.42, 0.98) var(--delay) forwards;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -20px, 0) rotate(0deg);
+  }
+
+  100% {
+    transform: translate3d(var(--drift), 110vh, 0) rotate(var(--spin));
+    opacity: 0;
+  }
 }
 
 .sr-only {

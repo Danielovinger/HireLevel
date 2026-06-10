@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.0 - 2026-06-10
+
+- Made the Kanban board stretch across ultrawide screens when fewer columns are visible.
+- Improved manual URL fetch fallbacks for slug-style job URLs and visible job-page text.
+- Added scaled level-up confetti, with larger bursts when multiple levels are gained at once.
+
 ## v1.2.0 - 2026-06-07
 
 - Added optional Chrome/Edge local JSON data-file autosave through Settings -> Data Storage.
