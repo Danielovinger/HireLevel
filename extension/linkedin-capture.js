@@ -5,16 +5,13 @@
   const statusSelectId = "hirelevel-status-select";
   let selectedBoardMemory = "";
   let selectedStatusMemory = "applied";
+  let latestCaptureId = "";
 
   init();
 
   async function init() {
     await addCaptureControls();
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== "local" || (!changes.hireLevelBoards && !changes.hireLevelTheme)) return;
-      document.getElementById(wrapperId)?.remove();
-      addCaptureControls();
-    });
+    chrome.storage.onChanged.addListener(handleStorageChange);
     observePageChanges();
   }
 
@@ -140,6 +137,7 @@
   async function captureCurrentJob() {
     const button = document.getElementById(buttonId);
     const captureId = createCaptureId();
+    latestCaptureId = captureId;
     const boards = await getBoards();
     const selectedBoardId = document.getElementById(selectId)?.value || (boards.length === 1 ? boards[0].id : null);
     selectedBoardMemory = selectedBoardId || selectedBoardMemory;
@@ -158,6 +156,12 @@
         candidates: collectDebugCandidates(),
       });
       flash(button, "Could not read job", "#b42318");
+      return;
+    }
+
+    if (selectedBoard?.jobIdentities?.includes(getCaptureIdentity(job))) {
+      await writeDebugLog({ type: "capture-duplicate", source: "linkedin", captureId, url: location.href, job });
+      flash(button, "Job already exists", "#b42318");
       return;
     }
 
@@ -268,30 +272,32 @@
   function scrapeLinkedInJob() {
     const selectedCard = getSelectedJobCard();
     const detailPane = getDetailPane();
-    const title = textFromSelectors([
-      ".job-details-jobs-unified-top-card__job-title h1",
-      ".job-details-jobs-unified-top-card__job-title",
-      ".jobs-unified-top-card__job-title h1",
-      ".jobs-unified-top-card__job-title",
-      ".job-details-jobs-unified-top-card__job-title-link",
-      ".job-details-jobs-unified-top-card__title",
-      ".jobs-details-top-card__job-title",
-      ".job-view-layout h1",
-      "h1",
-    ]) || inferTitleFromPane(detailPane) || inferTitleFromCard(selectedCard);
+    const title = firstLikelyJobTitle([
+      ...textsFromSelectorsIn(detailPane, [
+        ".job-details-jobs-unified-top-card__job-title h1",
+        ".job-details-jobs-unified-top-card__job-title",
+        ".jobs-unified-top-card__job-title h1",
+        ".jobs-unified-top-card__job-title",
+        ".job-details-jobs-unified-top-card__job-title-link",
+        ".job-details-jobs-unified-top-card__title",
+        ".jobs-details-top-card__job-title",
+        "h1",
+      ]),
+      inferTitleFromCard(selectedCard),
+      inferTitleFromPane(detailPane),
+    ]);
     const company = cleanCompany(
-      textFromSelectors([
+      textFromSelectorsIn(detailPane, [
         ".job-details-jobs-unified-top-card__company-name a",
         ".job-details-jobs-unified-top-card__company-name",
         ".jobs-unified-top-card__company-name a",
         ".jobs-unified-top-card__company-name",
         ".job-details-jobs-unified-top-card__primary-description a",
         ".jobs-unified-top-card__primary-description a",
-        ".job-view-layout a[href*='/company/']",
         "a[href*='/company/']",
       ])
     ) || inferCompanyFromPane(detailPane) || inferCompanyFromCard(selectedCard);
-    const description = textFromSelectors([
+    const description = textFromSelectorsIn(detailPane, [
       ".jobs-description__content",
       ".jobs-box__html-content",
       "#job-details",
@@ -302,6 +308,14 @@
   }
 
   function getSelectedJobCard() {
+    const currentJobId = getCurrentLinkedInJobId();
+    if (currentJobId) {
+      const cardById =
+        document.querySelector(`[data-occludable-job-id="${currentJobId}"]`) ||
+        document.querySelector(`[data-job-id="${currentJobId}"]`) ||
+        document.querySelector(`a[href*="/jobs/view/${currentJobId}"]`)?.closest("li, .job-card-container, .jobs-search-results__list-item");
+      if (cardById) return cardById;
+    }
     return (
       document.querySelector(".jobs-search-results-list__list-item--active") ||
       document.querySelector(".job-card-container--clickable[aria-current='true']") ||
@@ -313,6 +327,7 @@
   function getDetailPane() {
     return (
       document.querySelector(".jobs-search__job-details") ||
+      document.querySelector(".scaffold-layout__detail") ||
       document.querySelector(".jobs-details") ||
       document.querySelector(".job-view-layout") ||
       document.querySelector("main")
@@ -321,11 +336,8 @@
 
   function inferTitleFromPane(pane) {
     if (!pane) return "";
-    return cleanText(
-      pane.querySelector("h1")?.innerText ||
-        pane.querySelector("h2")?.innerText ||
-        pane.querySelector("[data-test-job-title]")?.innerText ||
-        ""
+    return firstLikelyJobTitle(
+      Array.from(pane.querySelectorAll("[data-test-job-title], h1, h2"), (heading) => cleanText(heading.innerText || heading.textContent || ""))
     );
   }
 
@@ -342,13 +354,42 @@
 
   function inferTitleFromCard(card) {
     if (!card) return "";
-    return cleanText(
-      card.querySelector(".job-card-list__title--link")?.innerText ||
-        card.querySelector(".job-card-list__title")?.innerText ||
-        card.querySelector("a[href*='/jobs/view/']")?.innerText ||
-        card.querySelector("strong")?.innerText ||
-        ""
-    );
+    return firstLikelyJobTitle([
+      card.querySelector(".job-card-list__title--link")?.innerText,
+      card.querySelector(".job-card-list__title")?.innerText,
+      card.querySelector("a[href*='/jobs/view/']")?.innerText,
+      card.querySelector("strong")?.innerText,
+    ]);
+  }
+
+  function getCurrentLinkedInJobId() {
+    const url = new URL(location.href);
+    const queryId = url.searchParams.get("currentJobId");
+    if (queryId && /^\d+$/.test(queryId)) return queryId;
+    return url.pathname.match(/\/jobs\/view\/(\d+)/)?.[1] || "";
+  }
+
+  function firstLikelyJobTitle(candidates) {
+    return candidates.map(cleanText).find(isLikelyJobTitle) || "";
+  }
+
+  function isLikelyJobTitle(title) {
+    const lower = cleanText(title).toLowerCase().replace(/[?!]+$/, "");
+    if (!lower || lower.length > 180) return false;
+    const blockedTitles = [
+      "are these results helpful",
+      "is this information helpful",
+      "about the job",
+      "similar jobs",
+      "people you can reach out to",
+      "meet the hiring team",
+      "candidates who clicked apply",
+      "did you finish applying",
+    ];
+    if (blockedTitles.includes(lower)) return false;
+    if (/^(are|were) these (search )?results helpful\b/.test(lower)) return false;
+    if (lower.startsWith("job match is ") || lower.startsWith("see how you compare")) return false;
+    return true;
   }
 
   function inferCompanyFromCard(card) {
@@ -403,12 +444,12 @@
     const detailPane = getDetailPane();
     return {
       titleSelectors: [
-        textFromSelectors([".job-details-jobs-unified-top-card__job-title", ".jobs-unified-top-card__job-title", "h1"]),
+        textFromSelectorsIn(detailPane, [".job-details-jobs-unified-top-card__job-title", ".jobs-unified-top-card__job-title", "h1"]),
         inferTitleFromPane(detailPane),
         inferTitleFromCard(selectedCard),
       ].filter(Boolean),
       companySelectors: [
-        textFromSelectors([".job-details-jobs-unified-top-card__company-name", ".jobs-unified-top-card__company-name", "a[href*='/company/']"]),
+        textFromSelectorsIn(detailPane, [".job-details-jobs-unified-top-card__company-name", ".jobs-unified-top-card__company-name", "a[href*='/company/']"]),
         inferCompanyFromPane(detailPane),
         inferCompanyFromCard(selectedCard),
       ].filter(Boolean),
@@ -443,13 +484,39 @@
     }
   }
 
-  function textFromSelectors(selectors) {
+  async function handleStorageChange(changes, areaName) {
+    if (areaName !== "local") return;
+    const resultKey = latestCaptureId ? `hireLevelCaptureResult_${latestCaptureId}` : "";
+    const result = resultKey ? changes[resultKey]?.newValue : null;
+    if (result) {
+      if (result.action === "existing") flash(document.getElementById(buttonId), "Job already exists", "#b42318");
+      try {
+        await chrome.storage.local.remove(resultKey);
+      } catch {}
+    }
+    if (!changes.hireLevelBoards && !changes.hireLevelTheme) return;
+    document.getElementById(wrapperId)?.remove();
+    addCaptureControls();
+  }
+
+  function textFromSelectorsIn(root, selectors) {
+    if (!root) return "";
     for (const selector of selectors) {
-      const element = document.querySelector(selector);
+      const element = root.querySelector(selector);
       const text = cleanText(element?.innerText || element?.textContent || "");
       if (text) return text;
     }
     return "";
+  }
+
+  function textsFromSelectorsIn(root, selectors) {
+    if (!root) return [];
+    return selectors
+      .map((selector) => {
+        const element = root.querySelector(selector);
+        return cleanText(element?.innerText || element?.textContent || "");
+      })
+      .filter(Boolean);
   }
 
   function cleanCompany(text) {
@@ -468,14 +535,22 @@
     return `pendingHireLevelJob_${captureId}`;
   }
 
+  function getCaptureIdentity(job) {
+    return job?.source && job?.externalId ? `${job.source}:${job.externalId}` : job?.url || "";
+  }
+
   function flash(button, text, color) {
-    const originalText = button.textContent;
-    const originalBackground = button.style.background;
+    if (!button) return;
+    if (!button.dataset.hireLevelDefaultText) {
+      button.dataset.hireLevelDefaultText = button.textContent;
+      button.dataset.hireLevelDefaultBackground = button.style.background;
+    }
+    window.clearTimeout(button.hireLevelFlashTimer);
     button.textContent = text;
     button.style.background = color;
-    window.setTimeout(() => {
-      button.textContent = originalText;
-      button.style.background = originalBackground;
+    button.hireLevelFlashTimer = window.setTimeout(() => {
+      button.textContent = button.dataset.hireLevelDefaultText;
+      button.style.background = button.dataset.hireLevelDefaultBackground;
     }, 1800);
   }
 })();

@@ -6,17 +6,14 @@
   let lastSelectedCard = null;
   let selectedBoardMemory = "";
   let selectedStatusMemory = "applied";
+  let latestCaptureId = "";
 
   init();
 
   async function init() {
     await addCaptureControls();
     document.addEventListener("click", handleDocumentClick, true);
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== "local" || (!changes.hireLevelBoards && !changes.hireLevelTheme)) return;
-      document.getElementById(wrapperId)?.remove();
-      addCaptureControls();
-    });
+    chrome.storage.onChanged.addListener(handleStorageChange);
     observePageChanges();
   }
 
@@ -158,6 +155,7 @@
     if (button?.dataset.busy === "true") return;
     if (button) button.dataset.busy = "true";
     const captureId = createCaptureId();
+    latestCaptureId = captureId;
     const boards = await getBoards();
     const selectedBoardId = document.getElementById(selectId)?.value || (boards.length === 1 ? boards[0].id : null);
     selectedBoardMemory = selectedBoardId || selectedBoardMemory;
@@ -177,6 +175,13 @@
         candidates: collectDebugCandidates(),
       });
       flash(button, "Could not read job", "#b42318");
+      return;
+    }
+
+    if (selectedBoard?.jobIdentities?.includes(getCaptureIdentity(job))) {
+      await writeDebugLog({ type: "capture-duplicate", source: "glassdoor", captureId, url: location.href, job });
+      flash(button, "Job already exists", "#b42318");
+      if (button) button.dataset.busy = "false";
       return;
     }
 
@@ -617,6 +622,10 @@
     return `pendingHireLevelJob_${captureId}`;
   }
 
+  function getCaptureIdentity(job) {
+    return job?.source && job?.externalId ? `${job.source}:${job.externalId}` : job?.url || "";
+  }
+
   async function writeDebugLog(entry) {
     const { hireLevelDebugLog = [] } = await safeStorageGet("hireLevelDebugLog");
     const nextLog = Array.isArray(hireLevelDebugLog) ? hireLevelDebugLog.slice(-24) : [];
@@ -643,14 +652,33 @@
     }
   }
 
+  async function handleStorageChange(changes, areaName) {
+    if (areaName !== "local") return;
+    const resultKey = latestCaptureId ? `hireLevelCaptureResult_${latestCaptureId}` : "";
+    const result = resultKey ? changes[resultKey]?.newValue : null;
+    if (result) {
+      if (result.action === "existing") flash(document.getElementById(buttonId), "Job already exists", "#b42318");
+      try {
+        await chrome.storage.local.remove(resultKey);
+      } catch {}
+    }
+    if (!changes.hireLevelBoards && !changes.hireLevelTheme) return;
+    document.getElementById(wrapperId)?.remove();
+    addCaptureControls();
+  }
+
   function flash(button, text, color) {
-    const originalText = button.textContent;
-    const originalBackground = button.style.background;
+    if (!button) return;
+    if (!button.dataset.hireLevelDefaultText) {
+      button.dataset.hireLevelDefaultText = button.textContent;
+      button.dataset.hireLevelDefaultBackground = button.style.background;
+    }
+    window.clearTimeout(button.hireLevelFlashTimer);
     button.textContent = text;
     button.style.background = color;
-    window.setTimeout(() => {
-      button.textContent = originalText;
-      button.style.background = originalBackground;
+    button.hireLevelFlashTimer = window.setTimeout(() => {
+      button.textContent = button.dataset.hireLevelDefaultText;
+      button.style.background = button.dataset.hireLevelDefaultBackground;
     }, 1800);
   }
 })();

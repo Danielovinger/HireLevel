@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.0 - 2026-06-22
+
+- Added Forest, Terminal, Guild Hall, Space Station, and Cozy Desk board skins.
+- Added status glows for Applied, First Positive Answer, Interviewing, Offer, and Rejected / Withdrawn cards.
+- Added immediate duplicate detection to the LinkedIn and Glassdoor capture widgets, with tracker-confirmed fallback detection.
+- Improved LinkedIn capture for manually searched job lists by targeting the selected job ID and detail pane.
+- Prevented LinkedIn feedback prompts such as "Are these results helpful?" from being saved as job titles.
+- Added an acknowledgment for development assistance from OpenAI Codex.
+
 ## v1.3.0 - 2026-06-10
 
 - Made the Kanban board stretch across ultrawide screens when fewer columns are visible.

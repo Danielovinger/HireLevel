@@ -11,7 +11,20 @@ async function handleAppMessage(event) {
   if (event.source !== window) return;
   if (event.data?.source !== "hirelevel-app") return;
   if (event.data?.type === "IMPORT_RESULT") {
-    await writeDebugLog({ type: "board-import-result", results: event.data.results || [] });
+    const results = Array.isArray(event.data.results) ? event.data.results : [];
+    await writeDebugLog({ type: "board-import-result", results });
+    const captureResults = Object.fromEntries(
+      results.filter((result) => result.captureId).map((result) => [`hireLevelCaptureResult_${result.captureId}`, result])
+    );
+    const resultKeys = Object.keys(captureResults);
+    if (resultKeys.length) {
+      await chrome.storage.local.set(captureResults);
+      window.setTimeout(async () => {
+        try {
+          await chrome.storage.local.remove(resultKeys);
+        } catch {}
+      }, 15000);
+    }
     return;
   }
   if (event.data?.type !== "SYNC_BOARDS") return;

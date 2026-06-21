@@ -15,7 +15,71 @@
   --red: #d62f2f;
   --success: #13795b;
   --shadow: 0 12px 30px rgba(29, 36, 51, 0.08);
+  --board-surface: var(--bg);
+  --board-pattern: none;
+  --board-pattern-size: auto;
+  --skin-column-bg: var(--panel-soft);
+  --skin-column-border: var(--line);
+  --skin-column-dot: var(--column-dot);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html[data-board-skin="terminal"] {
+  --board-surface: #07110b;
+  --board-pattern: linear-gradient(rgba(59, 255, 123, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(59, 255, 123, 0.08) 1px, transparent 1px);
+  --board-pattern-size: 28px 28px;
+  --skin-column-bg: rgba(10, 28, 17, 0.94);
+  --skin-column-border: #237444;
+  --skin-column-dot: #299255;
+}
+
+html[data-board-skin="guild-hall"] {
+  --board-surface: #4c2024;
+  --board-pattern: linear-gradient(90deg, rgba(244, 205, 120, 0.08) 1px, transparent 1px);
+  --board-pattern-size: 38px 38px;
+  --skin-column-bg: rgba(255, 247, 223, 0.94);
+  --skin-column-border: #c59a4a;
+  --skin-column-dot: #d8bd80;
+}
+
+html[data-board-skin="space-station"] {
+  --board-surface: #101a29;
+  --board-pattern: radial-gradient(#6887a8 1px, transparent 1px), linear-gradient(90deg, rgba(143, 181, 214, 0.06) 1px, transparent 1px);
+  --board-pattern-size: 30px 30px, 90px 90px;
+  --skin-column-bg: rgba(225, 235, 242, 0.94);
+  --skin-column-border: #7793aa;
+  --skin-column-dot: #9bb0c0;
+}
+
+html[data-board-skin="cozy-desk"] {
+  --board-surface: #b66f48;
+  --board-pattern: linear-gradient(90deg, rgba(90, 43, 25, 0.13) 1px, transparent 1px);
+  --board-pattern-size: 52px 52px;
+  --skin-column-bg: rgba(255, 246, 230, 0.95);
+  --skin-column-border: #c9946f;
+  --skin-column-dot: #dfb895;
+}
+
+html[data-theme="dark"][data-board-skin="guild-hall"] {
+  --skin-column-bg: rgba(55, 29, 27, 0.96);
+  --skin-column-border: #8f6935;
+  --skin-column-dot: #755632;
+}
+
+html[data-theme="dark"][data-board-skin="space-station"] {
+  --skin-column-bg: rgba(24, 36, 50, 0.96);
+  --skin-column-border: #536f88;
+  --skin-column-dot: #49647c;
+}
+
+html[data-theme="dark"][data-board-skin="cozy-desk"] {
+  --skin-column-bg: rgba(54, 37, 29, 0.96);
+  --skin-column-border: #8c6048;
+  --skin-column-dot: #79513c;
+}
+
+html[data-board-skin="terminal"] .column-header h2 {
+  color: #d7ffe2;
 }
 
 html[data-color-scheme="mint"] {
@@ -391,6 +455,9 @@ textarea {
   height: calc(100vh - 146px);
   padding: 0 28px 28px;
   overflow: auto;
+  background-color: var(--board-surface);
+  background-image: var(--board-pattern);
+  background-size: var(--board-pattern-size);
 }
 
 .column {
@@ -398,10 +465,10 @@ textarea {
   flex-direction: column;
   min-height: 100%;
   height: max-content;
-  border: 1px solid var(--line);
+  border: 1px solid var(--skin-column-border);
   border-radius: 8px;
-  background-color: var(--panel-soft);
-  background-image: radial-gradient(var(--column-dot) 1.5px, transparent 1.5px);
+  background-color: var(--skin-column-bg);
+  background-image: radial-gradient(var(--skin-column-dot) 1.5px, transparent 1.5px);
   background-size: 20px 20px;
 }
 
@@ -446,6 +513,31 @@ textarea {
   background: var(--panel);
   box-shadow: 0 5px 16px rgba(29, 36, 51, 0.07);
   overflow: hidden;
+}
+
+.job-card[data-rarity="applied"] {
+  border-color: #46a66e;
+  box-shadow: 0 0 0 1px rgba(70, 166, 110, 0.2), 0 5px 18px rgba(29, 133, 76, 0.24);
+}
+
+.job-card[data-rarity="received-answer"] {
+  border-color: #418bd1;
+  box-shadow: 0 0 0 1px rgba(65, 139, 209, 0.22), 0 5px 20px rgba(38, 111, 184, 0.3);
+}
+
+.job-card[data-rarity="interviewing"] {
+  border-color: #8b63cf;
+  box-shadow: 0 0 0 1px rgba(139, 99, 207, 0.24), 0 5px 20px rgba(109, 69, 180, 0.32);
+}
+
+.job-card[data-rarity="offer"] {
+  border-color: #d2a329;
+  box-shadow: 0 0 0 1px rgba(210, 163, 41, 0.26), 0 5px 22px rgba(190, 137, 5, 0.38);
+}
+
+.job-card[data-rarity="rejected"] {
+  border-color: #d04c4c;
+  box-shadow: 0 0 0 1px rgba(208, 76, 76, 0.22), 0 5px 20px rgba(177, 42, 42, 0.3);
 }
 
 .job-card.dragging {

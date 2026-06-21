@@ -18,6 +18,8 @@ HireLevel is a small offline-first job application board for organizing job-sear
 - Add custom columns.
 - Drag jobs between columns or change status from an expanded card.
 - Expand cards to see the full description, notes, edit/delete actions, status selector, and original job link.
+- Personalize the board with Forest, Terminal, Guild Hall, Space Station, or Cozy Desk skins.
+- See application progress at a glance: Applied glows green, First Positive Answer blue, Interviewing purple, Offer gold, and Rejected / Withdrawn red. Saved and custom columns stay plain.
 - Optional local JSON data file with autosave in Chrome/Edge.
 - Local JSON export and import for backups.
 - No backend, login, analytics, or external package dependencies.
@@ -119,6 +121,8 @@ Automatic extension capture currently supports:
 
 Other job boards can still be tracked manually with URL entry and pasted job text.
 
+If a captured job is already on the selected board, the extension reports **Job already exists** instead of creating a duplicate.
+
 For the packaged Windows download, open `HireLevel.html` first, then enable **Allow access to file URLs** for the extension in the browser's extension details page. This lets the extension sync supported LinkedIn and Glassdoor captures into the local tracker.
 
 After pulling updates, click the extension reload button in `chrome://extensions` or `edge://extensions`, then refresh any open LinkedIn and HireLevel tabs.
@@ -133,6 +137,10 @@ Tracker data is saved locally. By default, HireLevel uses browser storage. In Ch
 - Reminders and follow-up dates.
 - Archive view.
 - Better company logo handling.
+
+## Acknowledgments
+
+HireLevel was built by Daniel Lovinger with development assistance from OpenAI Codex.
 
 ## License
 
