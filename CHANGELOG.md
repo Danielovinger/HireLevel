@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.4.1 - 2026-06-23
+
+- Reworked LinkedIn search-results capture to match the selected card using its numeric job ID and company.
+- Prevented locations, result counts, Premium prompts, and Job Seeker Insights headings from being saved as job titles.
+- Captured company logos from the matched LinkedIn card instead of unrelated jobs elsewhere on the page.
+- Added LinkedIn job IDs to captured records for more reliable duplicate detection across changing search URLs.
+- Kept extension success, duplicate, and error messages visible for 2.5 seconds without widget refreshes interrupting them.
+
 ## v1.4.0 - 2026-06-22
 
 - Added Forest, Terminal, Guild Hall, Space Station, and Cozy Desk board skins.

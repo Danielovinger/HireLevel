@@ -662,9 +662,16 @@
         await chrome.storage.local.remove(resultKey);
       } catch {}
     }
-    if (!changes.hireLevelBoards && !changes.hireLevelTheme) return;
+    const boardChoicesChanged = changes.hireLevelBoards && haveBoardChoicesChanged(changes.hireLevelBoards);
+    if (!boardChoicesChanged && !changes.hireLevelTheme) return;
     document.getElementById(wrapperId)?.remove();
     addCaptureControls();
+  }
+
+  function haveBoardChoicesChanged(change) {
+    const summarize = (boards) =>
+      (Array.isArray(boards) ? boards : []).map((board) => ({ id: board.id || "", name: board.name || "" }));
+    return JSON.stringify(summarize(change.oldValue)) !== JSON.stringify(summarize(change.newValue));
   }
 
   function flash(button, text, color) {
@@ -679,6 +686,6 @@
     button.hireLevelFlashTimer = window.setTimeout(() => {
       button.textContent = button.dataset.hireLevelDefaultText;
       button.style.background = button.dataset.hireLevelDefaultBackground;
-    }, 1800);
+    }, 2500);
   }
 })();

@@ -270,9 +270,22 @@
   }
 
   function scrapeLinkedInJob() {
-    const selectedCard = getSelectedJobCard();
     const detailPane = getDetailPane();
+    const companyFromPane = cleanCompany(
+      textFromSelectorsIn(detailPane, [
+        ".job-details-jobs-unified-top-card__company-name a",
+        ".job-details-jobs-unified-top-card__company-name",
+        ".jobs-unified-top-card__company-name a",
+        ".jobs-unified-top-card__company-name",
+        ".job-details-jobs-unified-top-card__primary-description a",
+        ".jobs-unified-top-card__primary-description a",
+        "a[href*='/company/']",
+      ])
+    ) || inferCompanyFromPane(detailPane);
+    const selectedCard = getSelectedJobCard(companyFromPane);
+    const company = companyFromPane || inferCompanyFromCard(selectedCard);
     const title = firstLikelyJobTitle([
+      inferTitleFromCard(selectedCard),
       ...textsFromSelectorsIn(detailPane, [
         ".job-details-jobs-unified-top-card__job-title h1",
         ".job-details-jobs-unified-top-card__job-title",
@@ -283,61 +296,145 @@
         ".jobs-details-top-card__job-title",
         "h1",
       ]),
-      inferTitleFromCard(selectedCard),
-      inferTitleFromPane(detailPane),
+      inferTitleFromPane(detailPane, company),
+      inferTitleFromDocumentMetadata(),
     ]);
-    const company = cleanCompany(
-      textFromSelectorsIn(detailPane, [
-        ".job-details-jobs-unified-top-card__company-name a",
-        ".job-details-jobs-unified-top-card__company-name",
-        ".jobs-unified-top-card__company-name a",
-        ".jobs-unified-top-card__company-name",
-        ".job-details-jobs-unified-top-card__primary-description a",
-        ".jobs-unified-top-card__primary-description a",
-        "a[href*='/company/']",
-      ])
-    ) || inferCompanyFromPane(detailPane) || inferCompanyFromCard(selectedCard);
+    const descriptionElement = getDescriptionElement();
     const description = textFromSelectorsIn(detailPane, [
       ".jobs-description__content",
       ".jobs-box__html-content",
       "#job-details",
       ".jobs-description-content__text",
-    ]) || inferDescriptionFromPane(detailPane);
-    const companyLogoUrl = inferCompanyLogoUrl(detailPane, selectedCard);
-    return { title, company, description, companyLogoUrl, url: location.href, capturedAt: new Date().toISOString(), source: "linkedin" };
+    ]) || getCleanLines(descriptionElement).join("\n") || inferDescriptionFromPane(detailPane);
+    const companyLogoUrl = inferCompanyLogoUrl(detailPane, selectedCard, company);
+    return {
+      title,
+      company,
+      description,
+      companyLogoUrl,
+      externalId: getCurrentLinkedInJobId(),
+      url: location.href,
+      capturedAt: new Date().toISOString(),
+      source: "linkedin",
+    };
   }
 
-  function getSelectedJobCard() {
+  function getSelectedJobCard(company = "") {
     const currentJobId = getCurrentLinkedInJobId();
     if (currentJobId) {
-      const cardById =
-        document.querySelector(`[data-occludable-job-id="${currentJobId}"]`) ||
-        document.querySelector(`[data-job-id="${currentJobId}"]`) ||
-        document.querySelector(`a[href*="/jobs/view/${currentJobId}"]`)?.closest("li, .job-card-container, .jobs-search-results__list-item");
+      const cardById = findJobCardById(currentJobId);
       if (cardById) return cardById;
     }
-    return (
+
+    const activeCard =
       document.querySelector(".jobs-search-results-list__list-item--active") ||
       document.querySelector(".job-card-container--clickable[aria-current='true']") ||
-      document.querySelector(".job-card-container--clickable.jobs-card-container--active") ||
-      document.querySelector(".jobs-search-results-list__list-item")
-    );
+      document.querySelector(".job-card-container--clickable[aria-selected='true']") ||
+      document.querySelector(".job-card-container--clickable.jobs-card-container--active");
+    if (activeCard && (!company || elementContainsText(activeCard, company))) return activeCard;
+
+    if (company) {
+      const cards = Array.from(
+        new Set(
+          document.querySelectorAll(
+            ".jobs-search-results-list__list-item, .jobs-search-results__list-item, .job-card-container, [data-occludable-job-id]"
+          )
+        )
+      );
+      const companyCard = cards.find((card) => elementContainsText(card, company));
+      if (companyCard) return companyCard;
+    }
+
+    return activeCard || document.querySelector(".jobs-search-results-list__list-item, .jobs-search-results__list-item, .job-card-container");
   }
 
   function getDetailPane() {
-    return (
+    const knownPane =
       document.querySelector(".jobs-search__job-details") ||
+      document.querySelector(".jobs-search__job-details--container") ||
+      document.querySelector(".jobs-search__job-details--wrapper") ||
       document.querySelector(".scaffold-layout__detail") ||
       document.querySelector(".jobs-details") ||
-      document.querySelector(".job-view-layout") ||
-      document.querySelector("main")
+      document.querySelector(".job-view-layout");
+    if (knownPane) return knownPane;
+
+    const descriptionElement = getDescriptionElement();
+    let candidate = descriptionElement;
+    let fallback = null;
+    for (let depth = 0; candidate && depth < 10; depth += 1, candidate = candidate.parentElement) {
+      if (candidate.matches?.("main")) break;
+      const lines = getCleanLines(candidate);
+      const aboutIndex = lines.findIndex((line) => line.toLowerCase() === "about the job");
+      const hasCompany = Boolean(candidate.querySelector?.("a[href*='/company/']"));
+      const hasHeading = Boolean(candidate.querySelector?.("h1, h2, [data-test-job-title]"));
+      if (aboutIndex > 0 && hasHeading) fallback = candidate;
+      if (aboutIndex > 0 && hasCompany) return candidate;
+    }
+    return fallback;
+  }
+
+  function getDescriptionElement() {
+    return document.querySelector(
+      ".jobs-description__content, .jobs-box__html-content, #job-details, .jobs-description-content__text"
     );
   }
 
-  function inferTitleFromPane(pane) {
+  function findJobCardById(jobId) {
+    const resultsRoot =
+      document.querySelector(".jobs-search-results-list") ||
+      document.querySelector(".scaffold-layout__list") ||
+      document.querySelector("[class*='jobs-search-results']");
+    const roots = [resultsRoot, document].filter(Boolean);
+    const selectors = [
+      `[data-occludable-job-id="${jobId}"]`,
+      `[data-job-id="${jobId}"]`,
+      `[data-entity-urn*="${jobId}"]`,
+      `a[href*="/jobs/view/${jobId}"]`,
+      `a[href*="currentJobId=${jobId}"]`,
+      `a[href*="${jobId}"]`,
+    ];
+
+    for (const root of roots) {
+      for (const selector of selectors) {
+        const match = root.querySelector?.(selector);
+        if (!match) continue;
+        const card = findCardContainer(match);
+        if (card) return card;
+      }
+    }
+    return null;
+  }
+
+  function findCardContainer(element) {
+    const knownCard = element.closest?.(
+      ".jobs-search-results-list__list-item, .jobs-search-results__list-item, .job-card-container, [data-view-name='job-card'], [data-occludable-job-id], [data-job-id], li[role='listitem']"
+    );
+    if (knownCard) return knownCard;
+
+    let candidate = element;
+    let best = null;
+    for (let depth = 0; candidate && depth < 7; depth += 1, candidate = candidate.parentElement) {
+      const textLength = cleanText(candidate.innerText || candidate.textContent || "").length;
+      if (textLength > 1800) break;
+      if (textLength >= 10) best = candidate;
+    }
+    return best;
+  }
+
+  function inferTitleFromPane(pane, company = "") {
     if (!pane) return "";
+    const lines = getCleanLines(pane).slice(0, 24);
+    const companyKey = normalizeMatchText(company);
+    const companyIndex = companyKey ? lines.findIndex((line) => normalizeMatchText(line).includes(companyKey)) : -1;
+    const titleAfterCompany =
+      companyIndex >= 0
+        ? lines.slice(companyIndex + 1, companyIndex + 6).find((line) => isLikelyPaneTitleLine(line, company))
+        : "";
     return firstLikelyJobTitle(
-      Array.from(pane.querySelectorAll("[data-test-job-title], h1, h2"), (heading) => cleanText(heading.innerText || heading.textContent || ""))
+      [
+        titleAfterCompany,
+        ...Array.from(pane.querySelectorAll("[data-test-job-title], h1, h2"), (heading) => cleanText(heading.innerText || heading.textContent || "")),
+      ]
     );
   }
 
@@ -347,8 +444,10 @@
     if (companyLink) return cleanCompany(companyLink.innerText);
     const lines = getCleanLines(pane).slice(0, 8);
     const title = inferTitleFromPane(pane);
-    const afterTitleIndex = lines.findIndex((line) => line === title);
-    const companyLine = lines.slice(Math.max(0, afterTitleIndex + 1)).find(isLikelyCompanyLine);
+    const titleIndex = lines.findIndex((line) => line === title);
+    const companyBeforeTitle = titleIndex > 0 ? lines.slice(Math.max(0, titleIndex - 3), titleIndex).reverse().find(isLikelyCompanyLine) : "";
+    const companyAfterTitle = lines.slice(Math.max(0, titleIndex + 1)).find(isLikelyCompanyLine);
+    const companyLine = companyBeforeTitle || companyAfterTitle || lines.find(isLikelyCompanyLine);
     return cleanCompany(companyLine || "");
   }
 
@@ -357,9 +456,21 @@
     return firstLikelyJobTitle([
       card.querySelector(".job-card-list__title--link")?.innerText,
       card.querySelector(".job-card-list__title")?.innerText,
+      card.querySelector("[data-view-name='job-card'] a")?.innerText,
       card.querySelector("a[href*='/jobs/view/']")?.innerText,
+      card.querySelector("a[href*='currentJobId=']")?.innerText,
       card.querySelector("strong")?.innerText,
     ]);
+  }
+
+  function inferTitleFromDocumentMetadata() {
+    const metadataTitle = cleanText(
+      document.querySelector("meta[property='og:title']")?.content ||
+        document.querySelector("meta[name='twitter:title']")?.content ||
+        ""
+    );
+    const pageTitle = cleanText(document.title || "").replace(/\s*\|\s*LinkedIn\s*$/i, "");
+    return firstLikelyJobTitle([metadataTitle, pageTitle]);
   }
 
   function getCurrentLinkedInJobId() {
@@ -385,11 +496,54 @@
       "meet the hiring team",
       "candidates who clicked apply",
       "did you finish applying",
+      "take the next step in your job search",
+      "application status",
+      "application submitted",
+      "premium",
+      "how promoted jobs are ranked",
     ];
     if (blockedTitles.includes(lower)) return false;
     if (/^(are|were) these (search )?results helpful\b/.test(lower)) return false;
-    if (lower.startsWith("job match is ") || lower.startsWith("see how you compare")) return false;
+    if (/^\d+\+?\s+results?$/.test(lower)) return false;
+    if (lower.startsWith("job match is ") || lower.startsWith("see how you compare") || lower.startsWith("take the next step")) return false;
+    if (lower.startsWith("exclusive job seeker insights about ")) return false;
+    if (lower.includes(" jobs in ") || lower.includes("job search")) return false;
     return true;
+  }
+
+  function isLikelyPaneTitleLine(line, company = "") {
+    const lower = cleanText(line).toLowerCase();
+    if (!isLikelyJobTitle(line)) return false;
+    if (company && normalizeMatchText(line) === normalizeMatchText(company)) return false;
+    if (line.includes("\u00b7")) return false;
+    if (lower.includes("applicant") || lower.includes("promoted by") || lower.includes("actively reviewing")) return false;
+    if (/\b\d+\s+(day|week|month|year)s?\s+ago\b/.test(lower)) return false;
+    if (["on-site", "hybrid", "remote", "full-time", "part-time", "contract", "practice for an interview"].includes(lower)) return false;
+    if (isLikelyLocationOnly(line)) return false;
+    return true;
+  }
+
+  function isLikelyLocationOnly(line) {
+    if (!line.includes(",") || line.length > 70) return false;
+    const lower = cleanText(line).toLowerCase();
+    const roleWords = [
+      "engineer",
+      "developer",
+      "manager",
+      "specialist",
+      "architect",
+      "designer",
+      "analyst",
+      "consultant",
+      "director",
+      "lead",
+      "support",
+      "sales",
+      "product",
+      "data",
+      "software",
+    ];
+    return !roleWords.some((word) => lower.includes(word));
   }
 
   function inferCompanyFromCard(card) {
@@ -407,28 +561,50 @@
     return lines.slice(start + 1).filter(isLikelyDescriptionLine).join("\n");
   }
 
-  function inferCompanyLogoUrl(detailPane, selectedCard) {
-    const image =
-      detailPane?.querySelector("img[alt*='logo' i], img[class*='logo' i], img[src*='media.licdn.com']") ||
-      selectedCard?.querySelector("img[alt*='logo' i], img[class*='logo' i], img[src*='media.licdn.com']");
-    const src = image?.currentSrc || image?.src || "";
+  function inferCompanyLogoUrl(detailPane, selectedCard, company = "") {
+    const cardImage = selectedCard?.querySelector("img[src], img[data-delayed-url]");
+    const cardSrc = getImageSource(cardImage);
+    if (cardSrc) return cardSrc;
+
+    const companyKey = normalizeMatchText(company);
+    const paneImages = Array.from(detailPane?.querySelectorAll?.("img[src], img[data-delayed-url]") || []);
+    const matchingImage = paneImages.find((image) => {
+      const label = normalizeMatchText(`${image.alt || ""} ${image.title || ""}`);
+      return companyKey && label.includes(companyKey);
+    });
+    return getImageSource(matchingImage);
+  }
+
+  function getImageSource(image) {
+    const src = image?.currentSrc || image?.src || image?.dataset?.delayedUrl || "";
     if (!src || src.startsWith("data:")) return "";
     return src;
   }
 
   function getCleanLines(element) {
-    return cleanText(element?.innerText || element?.textContent || "")
-      .split(/\n|(?<=\.)\s+(?=[A-Z])/)
+    return String(element?.innerText || element?.textContent || "")
+      .split(/\r?\n/)
       .map((line) => cleanText(line))
       .filter(Boolean);
+  }
+
+  function elementContainsText(element, text) {
+    const needle = normalizeMatchText(text);
+    return Boolean(needle) && normalizeMatchText(element?.innerText || element?.textContent || "").includes(needle);
+  }
+
+  function normalizeMatchText(text) {
+    return cleanText(text).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   }
 
   function isLikelyCompanyLine(line) {
     const lower = cleanText(line).toLowerCase();
     if (!line || line.length > 90) return false;
+    if (line.includes("\u00b7")) return false;
     if (lower.includes("applicant") || lower.includes("promoted") || lower.includes("easy apply")) return false;
     if (lower.includes("tel aviv") || lower.includes("israel") || lower.includes("hybrid") || lower.includes("remote")) return false;
     if (lower.includes("applied") || lower.includes("week ago") || lower.includes("month ago")) return false;
+    if (["premium", "application status", "application submitted", "on-site", "full-time", "part-time", "contract"].includes(lower)) return false;
     return true;
   }
 
@@ -440,8 +616,15 @@
   }
 
   function collectDebugCandidates() {
-    const selectedCard = getSelectedJobCard();
     const detailPane = getDetailPane();
+    const companyFromPane = cleanCompany(
+      textFromSelectorsIn(detailPane, [
+        ".job-details-jobs-unified-top-card__company-name",
+        ".jobs-unified-top-card__company-name",
+        "a[href*='/company/']",
+      ])
+    ) || inferCompanyFromPane(detailPane);
+    const selectedCard = getSelectedJobCard(companyFromPane);
     return {
       titleSelectors: [
         textFromSelectorsIn(detailPane, [".job-details-jobs-unified-top-card__job-title", ".jobs-unified-top-card__job-title", "h1"]),
@@ -494,9 +677,16 @@
         await chrome.storage.local.remove(resultKey);
       } catch {}
     }
-    if (!changes.hireLevelBoards && !changes.hireLevelTheme) return;
+    const boardChoicesChanged = changes.hireLevelBoards && haveBoardChoicesChanged(changes.hireLevelBoards);
+    if (!boardChoicesChanged && !changes.hireLevelTheme) return;
     document.getElementById(wrapperId)?.remove();
     addCaptureControls();
+  }
+
+  function haveBoardChoicesChanged(change) {
+    const summarize = (boards) =>
+      (Array.isArray(boards) ? boards : []).map((board) => ({ id: board.id || "", name: board.name || "" }));
+    return JSON.stringify(summarize(change.oldValue)) !== JSON.stringify(summarize(change.newValue));
   }
 
   function textFromSelectorsIn(root, selectors) {
@@ -551,6 +741,6 @@
     button.hireLevelFlashTimer = window.setTimeout(() => {
       button.textContent = button.dataset.hireLevelDefaultText;
       button.style.background = button.dataset.hireLevelDefaultBackground;
-    }, 1800);
+    }, 2500);
   }
 })();
