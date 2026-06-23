@@ -481,7 +481,22 @@
   }
 
   function firstLikelyJobTitle(candidates) {
-    return candidates.map(cleanText).find(isLikelyJobTitle) || "";
+    return candidates.map(normalizeLinkedInJobTitle).find(isLikelyJobTitle) || "";
+  }
+
+  function normalizeLinkedInJobTitle(title) {
+    const cleaned = cleanText(title)
+      .replace(/\s*\(verified job\)/gi, "")
+      .replace(/\s+with verification$/i, "")
+      .trim();
+    const words = cleaned.split(" ").filter(Boolean);
+    if (words.length > 1 && words.length % 2 === 0) {
+      const midpoint = words.length / 2;
+      const firstHalf = words.slice(0, midpoint).join(" ");
+      const secondHalf = words.slice(midpoint).join(" ");
+      if (firstHalf.toLowerCase() === secondHalf.toLowerCase()) return firstHalf;
+    }
+    return cleaned;
   }
 
   function isLikelyJobTitle(title) {

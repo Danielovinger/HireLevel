@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.4.2 - 2026-06-23
+
+- Removed LinkedIn verification wording from captured job titles.
+- Collapsed exact duplicated title text exposed by LinkedIn's combined visible and accessibility labels.
+- Preserved legitimate titles that contain intentionally repeated words.
+
 ## v1.4.1 - 2026-06-23
 
 - Reworked LinkedIn search-results capture to match the selected card using its numeric job ID and company.
