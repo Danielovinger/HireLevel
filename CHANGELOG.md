@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5.0 - 2026-06-27
+
+- Added a per-job timeline inside expanded job cards.
+- Automatically records job creation, extension captures, edits, note updates, status moves, and XP awards.
+- Added a contact log for recruiters, hiring managers, referrals, and other job-specific conversations.
+- Included contact log details in board search.
+
 ## v1.4.2 - 2026-06-23
 
 - Removed LinkedIn verification wording from captured job titles.

@@ -300,6 +300,34 @@
             </div>
           </dl>
           <textarea class="notes-input" aria-label="Job notes"></textarea>
+          <section class="contact-log" aria-label="Contact log">
+            <div class="detail-section-header">
+              <h3>Contact Log</h3>
+              <span>Recruiters, hiring managers, referrals</span>
+            </div>
+            <div class="contact-list"></div>
+            <form class="contact-form">
+              <input name="name" type="text" required placeholder="Name" aria-label="Contact name" />
+              <input name="role" type="text" placeholder="Role" aria-label="Contact role" />
+              <select name="channel" aria-label="Contact channel">
+                <option value="LinkedIn">LinkedIn</option>
+                <option value="Email">Email</option>
+                <option value="Phone">Phone</option>
+                <option value="Referral">Referral</option>
+                <option value="Other">Other</option>
+              </select>
+              <input name="date" type="date" aria-label="Contact date" />
+              <textarea name="notes" rows="2" placeholder="What happened?" aria-label="Contact notes"></textarea>
+              <button class="secondary-btn" type="submit">Add Contact</button>
+            </form>
+          </section>
+          <section class="job-timeline" aria-label="Job timeline">
+            <div class="detail-section-header">
+              <h3>Timeline</h3>
+              <span>Automatic job history</span>
+            </div>
+            <ol class="timeline-list"></ol>
+          </section>
           <div class="card-actions">
             <a class="job-link" target="_blank" rel="noreferrer">View Job Link</a>
             <button class="danger-btn delete-job" type="button">Delete</button>

@@ -111,6 +111,7 @@ jobForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(jobForm);
   const board = getActiveBoard();
+  const existingJob = editingJobId ? board.jobs.find((job) => job.id === editingJobId) : null;
   const job = {
     id: editingJobId || createId(),
     url: formData.get("url").trim(),
@@ -120,11 +121,22 @@ jobForm.addEventListener("submit", (event) => {
     status: formData.get("status"),
     description: formData.get("description").trim(),
     notes: formData.get("notes").trim(),
+    source: existingJob?.source || "",
+    externalId: existingJob?.externalId || "",
+    companyLogoUrl: existingJob?.companyLogoUrl || "",
+    timeline: normalizeTimeline(existingJob?.timeline),
+    contacts: normalizeContacts(existingJob?.contacts),
   };
 
   if (editingJobId) {
     board.jobs = board.jobs.map((existing) => (existing.id === editingJobId ? job : existing));
+    if (existingJob?.status !== job.status) {
+      addJobTimelineEvent(board, job.id, "status", `Moved to ${getColumnName(board, job.status)}`, `From ${getColumnName(board, existingJob.status)}.`);
+    } else {
+      addJobTimelineEvent(board, job.id, "edited", "Job details edited");
+    }
   } else {
+    addJobTimelineEventToJob(job, "created", `Added to ${getColumnName(board, job.status)}`, "Created manually in HireLevel.");
     board.jobs.push(job);
   }
 
@@ -590,6 +602,7 @@ function renderLevelPanel() {
 }
 
 function renderCard(job) {
+  ensureJobCollections(job);
   const card = cardTemplate.content.firstElementChild.cloneNode(true);
   const summary = card.querySelector(".card-summary");
   const details = card.querySelector(".card-details");
@@ -607,6 +620,8 @@ function renderCard(job) {
   card.querySelector(".job-link").href = job.url || "#";
   card.querySelector(".job-link").toggleAttribute("hidden", !job.url);
   card.querySelector(".notes-input").value = job.notes || "";
+  renderContactLog(card.querySelector(".contact-list"), job.contacts);
+  renderTimeline(card.querySelector(".timeline-list"), job.timeline);
 
   icon.textContent = initials(job.company);
   if (faviconUrl) {
@@ -630,11 +645,83 @@ function renderCard(job) {
   card.querySelector(".notes-input").addEventListener("change", (event) => updateJob(job.id, { notes: event.target.value }));
   card.querySelector(".delete-job").addEventListener("click", () => deleteJob(job.id));
   card.querySelector(".edit-job").addEventListener("click", () => openJobDialog(job));
+  card.querySelector(".contact-form [name='date']").value = new Date().toISOString().slice(0, 10);
+  card.querySelector(".contact-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    addContactLogEntry(job.id, new FormData(event.currentTarget));
+  });
+  card.querySelectorAll(".delete-contact").forEach((button) => {
+    button.addEventListener("click", () => deleteContactLogEntry(job.id, button.dataset.contactId));
+  });
 
   const statusSelect = card.querySelector(".status-select");
   populateStatusSelect(statusSelect, job.status);
   statusSelect.addEventListener("change", (event) => moveJob(job.id, event.target.value));
   return card;
+}
+
+function renderContactLog(list, contacts) {
+  list.innerHTML = "";
+  if (!contacts.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-detail";
+    empty.textContent = "No contacts logged yet.";
+    list.appendChild(empty);
+    return;
+  }
+
+  contacts
+    .slice()
+    .sort((first, second) => second.date.localeCompare(first.date))
+    .forEach((contact) => {
+      const item = document.createElement("article");
+      item.className = "contact-entry";
+
+      const header = document.createElement("div");
+      const name = document.createElement("strong");
+      const meta = document.createElement("span");
+      const deleteButton = document.createElement("button");
+
+      name.textContent = contact.name || "Contact";
+      meta.textContent = [contact.role, contact.channel, formatDate(contact.date)].filter(Boolean).join(" - ");
+      deleteButton.className = "text-danger delete-contact";
+      deleteButton.type = "button";
+      deleteButton.dataset.contactId = contact.id;
+      deleteButton.textContent = "Remove";
+
+      header.append(name, deleteButton);
+      item.append(header, meta);
+      if (contact.notes) {
+        const notes = document.createElement("p");
+        notes.textContent = contact.notes;
+        item.appendChild(notes);
+      }
+      list.appendChild(item);
+    });
+}
+
+function renderTimeline(list, timeline) {
+  list.innerHTML = "";
+  if (!timeline.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-detail";
+    empty.textContent = "No timeline activity yet.";
+    list.appendChild(empty);
+    return;
+  }
+
+  timeline
+    .slice()
+    .sort((first, second) => second.at.localeCompare(first.at))
+    .forEach((event) => {
+      const item = document.createElement("li");
+      const title = document.createElement("strong");
+      const meta = document.createElement("span");
+      title.textContent = event.title;
+      meta.textContent = [formatDateTime(event.at), event.details].filter(Boolean).join(" - ");
+      item.append(title, meta);
+      list.appendChild(item);
+    });
 }
 
 function switchView(viewId) {
@@ -814,6 +901,8 @@ function addCapturedJob(rawJob) {
       source: job.source,
       externalId: job.externalId,
       companyLogoUrl: job.companyLogoUrl,
+      timeline: normalizeTimeline(existing.timeline),
+      contacts: normalizeContacts(existing.contacts),
       id: existing.id,
       status: existing.status,
     };
@@ -851,6 +940,14 @@ function normalizeCapturedJob(rawJob) {
     dateApplied: new Date().toISOString().slice(0, 10),
     status,
     notes: "Captured from browser extension.",
+    timeline: [
+      createTimelineEvent(
+        "created",
+        `Captured to ${status === "saved" ? "Saved" : "Applied"}`,
+        source ? `Captured from ${source}.` : "Captured from browser extension."
+      ),
+    ],
+    contacts: [],
   };
 }
 
@@ -1046,7 +1143,12 @@ function moveJob(jobId, status, beforeJobId = null) {
   if (jobIndex < 0 || jobId === beforeJobId) return;
 
   const [job] = board.jobs.splice(jobIndex, 1);
+  const previousStatus = job.status;
   const movedJob = { ...job, status };
+  ensureJobCollections(movedJob);
+  if (previousStatus !== status) {
+    addJobTimelineEventToJob(movedJob, "status", `Moved to ${getColumnName(board, status)}`, `From ${getColumnName(board, previousStatus)}.`);
+  }
   const beforeIndex = beforeJobId ? board.jobs.findIndex((item) => item.id === beforeJobId) : -1;
   const insertIndex = beforeIndex >= 0 ? beforeIndex : getAppendIndexForStatus(board.jobs, status);
   board.jobs.splice(insertIndex, 0, movedJob);
@@ -1077,8 +1179,51 @@ function clearDropMarkers() {
 
 function updateJob(jobId, patch) {
   const board = getActiveBoard();
-  board.jobs = board.jobs.map((job) => (job.id === jobId ? { ...job, ...patch } : job));
+  board.jobs = board.jobs.map((job) => {
+    if (job.id !== jobId) return job;
+    const updatedJob = { ...job, ...patch };
+    ensureJobCollections(updatedJob);
+    if (Object.prototype.hasOwnProperty.call(patch, "notes")) {
+      addJobTimelineEventToJob(updatedJob, "note", "Notes updated");
+    }
+    return updatedJob;
+  });
   saveState();
+}
+
+function addContactLogEntry(jobId, formData) {
+  const board = getActiveBoard();
+  const job = board.jobs.find((item) => item.id === jobId);
+  if (!job) return;
+  ensureJobCollections(job);
+
+  const contact = {
+    id: createId(),
+    name: cleanText(formData.get("name")),
+    role: cleanText(formData.get("role")),
+    channel: cleanText(formData.get("channel")) || "Other",
+    date: formData.get("date") || new Date().toISOString().slice(0, 10),
+    notes: cleanText(formData.get("notes")),
+  };
+  if (!contact.name) return;
+
+  job.contacts.push(contact);
+  addJobTimelineEventToJob(job, "contact", `Contact logged: ${contact.name}`, [contact.channel, contact.role].filter(Boolean).join(" - "));
+  saveState();
+  renderApp();
+}
+
+function deleteContactLogEntry(jobId, contactId) {
+  const board = getActiveBoard();
+  const job = board.jobs.find((item) => item.id === jobId);
+  if (!job) return;
+  ensureJobCollections(job);
+  const contact = job.contacts.find((item) => item.id === contactId);
+  if (!contact) return;
+  job.contacts = job.contacts.filter((item) => item.id !== contactId);
+  addJobTimelineEventToJob(job, "contact", `Contact removed: ${contact.name}`);
+  saveState();
+  renderApp();
 }
 
 function deleteJob(jobId) {
@@ -1112,6 +1257,7 @@ function awardXpForColumn(boardId, jobId, columnId) {
   if (alreadyEarned) return 0;
   const previousLevel = calculateLevel(calculateVisibleXp()).level;
   state.xpEvents.push(createXpEvent(boardId, jobId, columnId, xp));
+  addJobTimelineEvent(board, jobId, "xp", `Earned ${formatNumber(xp)} XP`, getColumnName(board, columnId));
   const nextLevel = calculateLevel(calculateVisibleXp()).level;
   if (nextLevel > previousLevel) showLevelUpConfetti(nextLevel - previousLevel);
   return xp;
@@ -1148,6 +1294,56 @@ function showLevelUpConfetti(levelsGained) {
 
   document.body.appendChild(layer);
   window.setTimeout(() => layer.remove(), 3800);
+}
+
+function ensureJobCollections(job) {
+  job.timeline = normalizeTimeline(job.timeline);
+  job.contacts = normalizeContacts(job.contacts);
+  return job;
+}
+
+function normalizeTimeline(timeline) {
+  return Array.isArray(timeline)
+    ? timeline
+        .filter((event) => event && event.title)
+        .map((event) => ({
+          id: event.id || createId(),
+          type: cleanText(event.type) || "note",
+          title: cleanText(event.title),
+          details: cleanText(event.details),
+          at: event.at || new Date().toISOString(),
+        }))
+    : [];
+}
+
+function normalizeContacts(contacts) {
+  return Array.isArray(contacts)
+    ? contacts
+        .filter((contact) => contact && contact.name)
+        .map((contact) => ({
+          id: contact.id || createId(),
+          name: cleanText(contact.name),
+          role: cleanText(contact.role),
+          channel: cleanText(contact.channel) || "Other",
+          date: contact.date || new Date().toISOString().slice(0, 10),
+          notes: cleanText(contact.notes),
+        }))
+    : [];
+}
+
+function createTimelineEvent(type, title, details = "") {
+  return { id: createId(), type, title, details, at: new Date().toISOString() };
+}
+
+function addJobTimelineEvent(board, jobId, type, title, details = "") {
+  const job = board.jobs.find((item) => item.id === jobId);
+  if (!job) return;
+  addJobTimelineEventToJob(job, type, title, details);
+}
+
+function addJobTimelineEventToJob(job, type, title, details = "") {
+  ensureJobCollections(job);
+  job.timeline.push(createTimelineEvent(type, title, details));
 }
 
 function createXpEvent(boardId, jobId, columnId, xp) {
@@ -1301,9 +1497,22 @@ function populateStatusSelect(select, selected) {
   });
 }
 
+function getColumnName(board, columnId) {
+  return board.columns.find((column) => column.id === columnId)?.name || columnId || "Unknown";
+}
+
 function matchesQuery(job, query) {
   if (!query) return true;
-  return [job.title, job.company, job.description, job.notes].join(" ").toLowerCase().includes(query);
+  return [
+    job.title,
+    job.company,
+    job.description,
+    job.notes,
+    ...(Array.isArray(job.contacts) ? job.contacts.flatMap((contact) => [contact.name, contact.role, contact.channel, contact.notes]) : []),
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
 }
 
 function isDefaultColumn(columnId) {
@@ -1383,6 +1592,17 @@ function cleanCompanyLine(line) {
 function formatDate(date) {
   if (!date) return "No date";
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${date}T12:00:00`));
+}
+
+function formatDateTime(value) {
+  if (!value) return "No date";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function formatNumber(number) {
