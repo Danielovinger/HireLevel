@@ -18,6 +18,7 @@
         </div>
         <nav>
           <button class="nav-link active" type="button" data-view="boardView">Application Board</button>
+          <button class="nav-link" type="button" data-view="achievementsView">Achievements</button>
           <button class="nav-link" type="button" data-view="settingsView">Settings</button>
         </nav>
         <div class="sidebar-footer">
@@ -145,6 +146,17 @@
             </section>
           </div>
         </section>
+
+        <section id="achievementsView" class="view achievements-view" hidden>
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Account progression</p>
+              <h2>Achievements</h2>
+            </div>
+            <p id="achievementSummary" class="settings-help">0 / 20 unlocked</p>
+          </div>
+          <div id="achievementGrid" class="achievement-grid"></div>
+        </section>
       </main>
     </div>
 
@@ -262,6 +274,20 @@
           <button id="confirmYesBtn" class="danger-btn" type="submit">Yes</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="achievementDialog" class="achievement-dialog">
+      <div class="achievement-popup">
+        <p id="achievementQueueCount" class="eyebrow">Achievement unlocked</p>
+        <img id="achievementPopupIcon" alt="" />
+        <h2 id="achievementPopupName">Achievement</h2>
+        <p id="achievementPopupDescription"></p>
+        <strong id="achievementPopupXp">+25 XP</strong>
+        <div class="dialog-actions">
+          <button id="achievementSkipBtn" class="ghost-btn" type="button">Skip All</button>
+          <button id="achievementConfirmBtn" class="primary-btn" type="button">Confirm</button>
+        </div>
+      </div>
     </dialog>
 
     <template id="columnTemplate">

@@ -753,6 +753,53 @@ dd {
   padding: 22px;
 }
 
+.achievement-dialog {
+  width: min(420px, calc(100vw - 32px));
+  border: 0;
+  border-radius: 8px;
+  padding: 0;
+  background: transparent;
+}
+
+.achievement-dialog::backdrop {
+  background: rgba(13, 20, 18, 0.58);
+}
+
+.achievement-popup {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 26px;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--line));
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.24);
+  text-align: center;
+}
+
+.achievement-popup img {
+  width: 128px;
+  height: 128px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--accent-soft);
+}
+
+.achievement-popup h2,
+.achievement-popup p {
+  margin: 0;
+}
+
+.achievement-popup p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.achievement-popup strong {
+  color: var(--accent-dark);
+  font-size: 18px;
+}
+
 .dialog-header {
   display: flex;
   justify-content: space-between;
@@ -802,6 +849,72 @@ label {
 
 .settings-view {
   padding: 0 28px 28px;
+}
+
+.achievements-view {
+  padding: 0 28px 28px;
+}
+
+.view-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.view-heading h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.achievement-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  min-height: 128px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 80%, var(--bg));
+  opacity: 0.62;
+}
+
+.achievement-card.unlocked {
+  background: var(--panel);
+  opacity: 1;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent), 0 8px 24px rgba(29, 36, 51, 0.08);
+}
+
+.achievement-card img {
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--accent-soft);
+}
+
+.achievement-card h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+
+.achievement-card p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.achievement-card span {
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .settings-grid {

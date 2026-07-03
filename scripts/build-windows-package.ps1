@@ -19,6 +19,7 @@ Copy-Item (Join-Path $repoRoot "index.html") (Join-Path $packageRoot "HireLevel.
 Copy-Item (Join-Path $repoRoot "app.js") (Join-Path $packageRoot "app.js")
 Copy-Item (Join-Path $repoRoot "styles.css") (Join-Path $packageRoot "styles.css")
 
+Copy-Item (Join-Path $repoRoot "assets") (Join-Path $packageRoot "assets") -Recurse
 Copy-Item (Join-Path $repoRoot "extension") (Join-Path $packageRoot "extension") -Recurse
 Copy-Item (Join-Path $repoRoot "README.md") (Join-Path $packageRoot "README.md")
 Copy-Item (Join-Path $repoRoot "LICENSE") (Join-Path $packageRoot "LICENSE")

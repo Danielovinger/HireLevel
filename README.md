@@ -11,15 +11,16 @@ HireLevel is a small offline-first job application board for organizing job-sear
 - Browser extension capture for supported logged-in job boards, including LinkedIn and Glassdoor.
 - Paste-and-parse fallback for blocked job pages.
 - Application XP, levels, progress meter, and title ranks.
+- Account-level achievements with XP rewards, popup unlocks, icons, and JSON persistence.
 - Multiple job-search boards.
 - Global account XP or separate XP per board.
 - Board and progression reset controls with confirmation prompts.
-- Kanban-style columns for Saved, Applied, Received Answer, Interviewing, Offer, and Rejected.
+- Kanban-style columns for Saved, Applied, First Positive Answer, Interviewing, Offer, and Reject.
 - Add custom columns.
 - Drag jobs between columns or change status from an expanded card.
 - Expand cards to see the full description, notes, edit/delete actions, status selector, and original job link.
 - Personalize the board with Forest, Terminal, Guild Hall, Space Station, or Cozy Desk skins.
-- See application progress at a glance: Applied glows green, First Positive Answer blue, Interviewing purple, Offer gold, and Rejected / Withdrawn red. Saved and custom columns stay plain.
+- See application progress at a glance: Applied glows green, First Positive Answer blue, Interviewing purple, Offer gold, and Reject red. Saved and custom columns stay plain.
 - Optional local JSON data file with autosave in Chrome/Edge.
 - Local JSON export and import for backups.
 - No backend, login, analytics, or external package dependencies.
@@ -40,12 +41,14 @@ Jobs reward XP based on their current status:
 - Saved: 0 XP
 - Applied: 5 XP
 - First Positive Answer: 25 XP
-- Rejected / Withdrawn: 25 XP
+- Reject: 25 XP
 - Interviewing: 625 XP
 - Offer: 390,625 XP
 - Any custom column: 25 XP
 
 Each job can earn XP from a specific column only once. Moving a job out of a column and back into it will not grant that column's XP again. Deleting a job does not remove XP that was already earned.
+
+Achievements are account-level and unlock only once. Achievement XP is saved as account XP in the same JSON data and can help push the account into higher levels.
 
 Level requirements use a two-phase curve:
 

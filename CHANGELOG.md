@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.0 - 2026-07-03
+
+- Added account-level achievements with icons, popup unlocks, JSON persistence, and backfill for existing saved data.
+- Added achievement XP rewards, including a hidden capstone reward for "Why are you still here?".
+- Added a dedicated Achievements tab in the sidebar.
+- Renamed the default Rejected / Withdrawn column to Reject while preserving existing saved data compatibility.
+- Updated project documentation for achievements and the Reject workflow.
+
 ## v1.5.0 - 2026-06-27
 
 - Added a per-job timeline inside expanded job cards.

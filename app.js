@@ -12,7 +12,7 @@ const defaultColumns = [
   { id: "received-answer", name: "First Positive Answer", type: "default" },
   { id: "interviewing", name: "Interviewing", type: "default" },
   { id: "offer", name: "Offer", type: "default" },
-  { id: "rejected", name: "Rejected / Withdrawn", type: "default" },
+  { id: "rejected", name: "Reject", type: "default" },
 ];
 
 const statusXp = {
@@ -51,11 +51,233 @@ const romanNumerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "
 const maxLevel = 200;
 const endgameLevelStart = 100;
 const endgameCurveMultiplier = 4.6;
+const achievementDefinitions = [
+  {
+    id: "first-step",
+    name: "First Step",
+    description: "Add your first job.",
+    icon: "assets/achievements/first-step.png",
+    xpReward: 25,
+    condition: (stats) => stats.totalJobs >= 1,
+  },
+  {
+    id: "getting-serious",
+    name: "Getting Serious",
+    description: "Add 10 jobs.",
+    icon: "assets/achievements/getting-serious.png",
+    xpReward: 50,
+    condition: (stats) => stats.totalJobs >= 10,
+  },
+  {
+    id: "application-machine",
+    name: "Application Machine",
+    description: "Add 50 jobs.",
+    icon: "assets/achievements/application-machine.png",
+    xpReward: 100,
+    condition: (stats) => stats.totalJobs >= 50,
+  },
+  {
+    id: "spreadsheet-spirit",
+    name: "Spreadsheet Spirit",
+    description: "Add 100 jobs.",
+    icon: "assets/achievements/spreadsheet-spirit.png",
+    xpReward: 250,
+    condition: (stats) => stats.totalJobs >= 100,
+  },
+  {
+    id: "spray-and-pray",
+    name: "Spray and Pray",
+    description: "Add 250 jobs.",
+    icon: "assets/achievements/spray-and-pray.png",
+    xpReward: 1000,
+    condition: (stats) => stats.totalJobs >= 250,
+  },
+  {
+    id: "saved-for-later",
+    name: "Saved for Later",
+    description: "Save your first job without applying.",
+    icon: "assets/achievements/saved-for-later.png",
+    xpReward: 25,
+    condition: (stats) => stats.statusCounts.saved >= 1,
+  },
+  {
+    id: "sent-it",
+    name: "Sent It",
+    description: "Move a job to Applied.",
+    icon: "assets/achievements/sent-it.png",
+    xpReward: 25,
+    condition: (stats) => stats.statusCounts.applied >= 1 || stats.columnXpEvents.applied >= 1,
+  },
+  {
+    id: "positive-signal",
+    name: "Positive Signal",
+    description: "Move a job to First Positive Answer.",
+    icon: "assets/achievements/positive-signal.png",
+    xpReward: 50,
+    condition: (stats) => stats.statusCounts["received-answer"] >= 1 || stats.columnXpEvents["received-answer"] >= 1,
+  },
+  {
+    id: "interview-arc-begins",
+    name: "Interview Arc Begins",
+    description: "Move a job to Interviewing.",
+    icon: "assets/achievements/interview-arc-begins.png",
+    xpReward: 100,
+    condition: (stats) => stats.statusCounts.interviewing >= 1 || stats.columnXpEvents.interviewing >= 1,
+  },
+  {
+    id: "offer-on-the-table",
+    name: "Offer on the Table",
+    description: "Move a job to Offer.",
+    icon: "assets/achievements/offer-on-the-table.png",
+    xpReward: 1000,
+    condition: (stats) => stats.statusCounts.offer >= 1 || stats.columnXpEvents.offer >= 1,
+  },
+  {
+    id: "not-this-one",
+    name: "Not This One",
+    description: "Move a job to Reject.",
+    icon: "assets/achievements/not-this-one.png",
+    xpReward: 25,
+    condition: (stats) => stats.statusCounts.rejected >= 1 || stats.columnXpEvents.rejected >= 1,
+  },
+  {
+    id: "still-standing",
+    name: "Still Standing",
+    description: "Have 10 rejected jobs.",
+    icon: "assets/achievements/still-standing.png",
+    xpReward: 100,
+    condition: (stats) => stats.statusCounts.rejected >= 10 || stats.columnXpEvents.rejected >= 10,
+  },
+  {
+    id: "their-loss",
+    name: "Their loss...",
+    description: "Have 30 rejected jobs.",
+    icon: "assets/achievements/their-loss.png",
+    xpReward: 250,
+    condition: (stats) => stats.statusCounts.rejected >= 30 || stats.columnXpEvents.rejected >= 30,
+  },
+  {
+    id: "i-didnt-hear-no-bell",
+    name: "I didn't hear no bell!",
+    description: "Have 50 rejected jobs.",
+    icon: "assets/achievements/i-didnt-hear-no-bell.png",
+    xpReward: 1000,
+    condition: (stats) => stats.statusCounts.rejected >= 50 || stats.columnXpEvents.rejected >= 50,
+  },
+  {
+    id: "which-one-of-you",
+    name: "Which one of you was I talking to again?",
+    description: "Move 20 jobs to Interviewing.",
+    icon: "assets/achievements/which-one-of-you.png",
+    xpReward: 1000,
+    condition: (stats) => stats.statusCounts.interviewing >= 20 || stats.columnXpEvents.interviewing >= 20,
+  },
+  {
+    id: "pipeline-builder",
+    name: "Pipeline Builder",
+    description: "Have at least one job in Saved, Applied, First Positive Answer, Interviewing, and Offer.",
+    icon: "assets/achievements/pipeline-builder.png",
+    xpReward: 250,
+    condition: (stats) => ["saved", "applied", "received-answer", "interviewing", "offer"].every((status) => stats.statusCounts[status] >= 1),
+  },
+  {
+    id: "board-architect",
+    name: "Board Architect",
+    description: "Create a second board.",
+    icon: "assets/achievements/board-architect.png",
+    xpReward: 50,
+    condition: (stats) => stats.boardCount >= 2,
+  },
+  {
+    id: "custom-workflow",
+    name: "Custom Workflow",
+    description: "Add your first custom column.",
+    icon: "assets/achievements/custom-workflow.png",
+    xpReward: 25,
+    condition: (stats) => stats.customColumnCount >= 1,
+  },
+  {
+    id: "network-thread",
+    name: "Network Thread",
+    description: "Add your first contact log entry.",
+    icon: "assets/achievements/network-thread.png",
+    xpReward: 25,
+    condition: (stats) => stats.contactCount >= 1,
+  },
+  {
+    id: "people-person",
+    name: "People Person",
+    description: "Add 10 contact log entries.",
+    icon: "assets/achievements/people-person.png",
+    xpReward: 100,
+    condition: (stats) => stats.contactCount >= 10,
+  },
+  {
+    id: "historian",
+    name: "Historian",
+    description: "Have 25 timeline events recorded.",
+    icon: "assets/achievements/historian.png",
+    xpReward: 100,
+    condition: (stats) => stats.timelineEventCount >= 25,
+  },
+  {
+    id: "historian-archivist",
+    name: "Historian Archivist",
+    description: "Have 75 timeline events recorded.",
+    icon: "assets/achievements/historian-archivist.png",
+    xpReward: 250,
+    condition: (stats) => stats.timelineEventCount >= 75,
+  },
+  {
+    id: "historian-mythkeeper",
+    name: "Historian Mythkeeper",
+    description: "Have 250 timeline events recorded.",
+    icon: "assets/achievements/historian-mythkeeper.png",
+    xpReward: 1000,
+    condition: (stats) => stats.timelineEventCount >= 250,
+  },
+  {
+    id: "why-are-you-still-here",
+    name: "Why are you still here?",
+    description: "Get three offers. Seriously, go work.",
+    icon: "assets/achievements/why-are-you-still-here.png",
+    xpReward: "max-level",
+    hiddenXpReward: true,
+    condition: (stats) => stats.statusCounts.offer >= 3 || stats.columnXpEvents.offer >= 3,
+  },
+  {
+    id: "level-up-novice",
+    name: "Level Up Novice",
+    description: "Reach level 10.",
+    icon: "assets/achievements/level-up-novice.png",
+    xpReward: 100,
+    condition: (stats) => stats.accountLevel >= 10,
+  },
+  {
+    id: "level-up-advanced",
+    name: "Level Up Advanced",
+    description: "Reach level 75.",
+    icon: "assets/achievements/level-up-advanced.png",
+    xpReward: 250,
+    condition: (stats) => stats.accountLevel >= 75,
+  },
+  {
+    id: "level-up-master",
+    name: "Level Up Master",
+    description: "Reach level 150.",
+    icon: "assets/achievements/level-up-master.png",
+    xpReward: 1000,
+    condition: (stats) => stats.accountLevel >= 150,
+  },
+];
 
 let state = loadState();
 let editingJobId = null;
 let draggedJobId = null;
 let pendingConfirmAction = null;
+let achievementPopupQueue = [];
+let currentAchievementPopupId = null;
+let isEvaluatingAchievements = false;
 let dataFileHandle = null;
 let dataFileSavePromise = null;
 let dataFileSaveQueued = false;
@@ -67,10 +289,13 @@ const jobDialog = document.querySelector("#jobDialog");
 const columnDialog = document.querySelector("#columnDialog");
 const boardDialog = document.querySelector("#boardDialog");
 const confirmDialog = document.querySelector("#confirmDialog");
+const achievementDialog = document.querySelector("#achievementDialog");
 const jobForm = document.querySelector("#jobForm");
 const columnForm = document.querySelector("#columnForm");
 const boardForm = document.querySelector("#boardForm");
 const confirmForm = document.querySelector("#confirmForm");
+const achievementConfirmBtn = document.querySelector("#achievementConfirmBtn");
+const achievementSkipBtn = document.querySelector("#achievementSkipBtn");
 const searchInput = document.querySelector("#searchInput");
 const fetchMessage = document.querySelector("#fetchMessage");
 
@@ -95,6 +320,8 @@ document.querySelector("#createDataFileBtn").addEventListener("click", createDat
 document.querySelector("#openDataFileBtn").addEventListener("click", openDataFile);
 document.querySelector("#saveDataFileBtn").addEventListener("click", saveDataFileNow);
 document.querySelector("#confirmNoBtn").addEventListener("click", () => confirmDialog.close());
+achievementConfirmBtn.addEventListener("click", confirmCurrentAchievement);
+achievementSkipBtn.addEventListener("click", skipAchievementQueue);
 searchInput.addEventListener("input", renderApp);
 
 document.querySelectorAll("[data-close-dialog]").forEach((button) => {
@@ -189,21 +416,25 @@ confirmForm.addEventListener("submit", (event) => {
   renderApp();
 });
 
+queueUnseenAchievements();
+evaluateAchievements();
 renderApp();
+saveState();
+showNextAchievementPopup();
 initializeDataFile();
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY) || LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
   if (!saved) {
     const board = createBoard("My Job Search", []);
-    return { version: 2, settings: getDefaultSettings(), activeBoardId: board.id, boards: [board], xpEvents: [] };
+    return { version: 2, settings: getDefaultSettings(), activeBoardId: board.id, boards: [board], xpEvents: [], achievements: [] };
   }
 
   try {
     return migrateState(JSON.parse(saved));
   } catch {
     const board = createBoard("My Job Search", []);
-    return { version: 2, settings: getDefaultSettings(), activeBoardId: board.id, boards: [board], xpEvents: [] };
+    return { version: 2, settings: getDefaultSettings(), activeBoardId: board.id, boards: [board], xpEvents: [], achievements: [] };
   }
 }
 
@@ -221,6 +452,7 @@ function migrateState(parsed) {
       activeBoardId: boards.some((board) => board.id === parsed.activeBoardId) ? parsed.activeBoardId : boards[0]?.id,
       boards: boards.length ? boards : [createBoard("My Job Search", [])],
       xpEvents: Array.isArray(parsed.xpEvents) ? parsed.xpEvents : [],
+      achievements: normalizeAchievements(parsed.achievements),
     };
   }
 
@@ -232,6 +464,7 @@ function migrateState(parsed) {
     activeBoardId: legacyBoard.id,
     boards: [legacyBoard],
     xpEvents: [],
+    achievements: [],
   };
 
   legacyBoard.jobs.forEach((job) => {
@@ -244,12 +477,14 @@ function migrateState(parsed) {
 }
 
 function saveState() {
+  evaluateAchievements();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   queueDataFileSave();
   syncExtensionBoardList();
   const status = document.querySelector("#storageStatus");
   if (status) status.textContent = `Saved locally at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
   renderDataFileSettings();
+  window.setTimeout(showNextAchievementPopup, 0);
 }
 
 function renderApp() {
@@ -257,6 +492,7 @@ function renderApp() {
   applyTheme();
   renderBoardSelector();
   renderSettings();
+  renderAchievements();
   renderLevelPanel();
   renderBoard();
   syncExtensionBoardList();
@@ -330,6 +566,42 @@ function renderSettings() {
   renderDataFileSettings();
 }
 
+function renderAchievements() {
+  const grid = document.querySelector("#achievementGrid");
+  const summary = document.querySelector("#achievementSummary");
+  if (!grid || !summary) return;
+
+  const unlocked = getUnlockedAchievementMap();
+  summary.textContent = `${unlocked.size} / ${achievementDefinitions.length} unlocked`;
+  grid.innerHTML = "";
+
+  achievementDefinitions.forEach((achievement) => {
+    const unlockedRecord = unlocked.get(achievement.id);
+    const card = document.createElement("article");
+    card.className = "achievement-card";
+    card.classList.toggle("unlocked", Boolean(unlockedRecord));
+
+    const icon = document.createElement("img");
+    icon.src = achievement.icon;
+    icon.alt = "";
+
+    const content = document.createElement("div");
+    const title = document.createElement("h3");
+    const description = document.createElement("p");
+    const meta = document.createElement("span");
+
+    title.textContent = achievement.name;
+    description.textContent = achievement.description;
+    meta.textContent = unlockedRecord
+      ? `Unlocked ${formatDate(unlockedRecord.unlockedAt.slice(0, 10))} - +${formatAchievementXp(achievement)}`
+      : `Locked - +${formatAchievementXp(achievement)}`;
+
+    content.append(title, description, meta);
+    card.append(icon, content);
+    grid.appendChild(card);
+  });
+}
+
 function renderDataFileSettings(message = "") {
   const status = document.querySelector("#dataFileStatus");
   const createButton = document.querySelector("#createDataFileBtn");
@@ -384,8 +656,12 @@ async function initializeDataFile() {
     const loadedState = await readStateFromDataFile(dataFileHandle);
     if (loadedState) {
       state = loadedState;
+      queueUnseenAchievements();
+      evaluateAchievements();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       renderApp();
+      saveState();
+      showNextAchievementPopup();
       renderDataFileSettings(`Loaded data file: ${dataFileHandle.name}. Changes autosave to this file.`);
     }
   } catch (error) {
@@ -458,8 +734,12 @@ async function openDataFile() {
     dataFileHandle = handle;
     await saveStoredDataFileHandle(dataFileHandle);
     state = loadedState;
+    queueUnseenAchievements();
+    evaluateAchievements();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     renderApp();
+    saveState();
+    showNextAchievementPopup();
     renderDataFileSettings(`Opened data file: ${dataFileHandle.name}. Changes autosave to this file.`);
     syncExtensionBoardList();
   } catch (error) {
@@ -798,9 +1078,12 @@ function confirmResetBoardProgression() {
 function confirmResetAccountProgression() {
   openConfirm(
     "Reset account progression?",
-    "This removes all XP earned across every board. Jobs, boards, and columns will remain.",
+    "This removes all XP earned across every board. Achievements will remain unlocked. Jobs, boards, and columns will remain.",
     () => {
       state.xpEvents = [];
+      achievementPopupQueue = [];
+      currentAchievementPopupId = null;
+      if (achievementDialog.open) achievementDialog.close();
     }
   );
 }
@@ -1296,6 +1579,175 @@ function showLevelUpConfetti(levelsGained) {
   window.setTimeout(() => layer.remove(), 3800);
 }
 
+function normalizeAchievements(achievements) {
+  return Array.isArray(achievements)
+    ? achievements
+        .filter((achievement) => achievement && achievement.id)
+        .map((achievement) => ({
+          id: cleanText(achievement.id),
+          unlockedAt: achievement.unlockedAt || new Date().toISOString(),
+          seenAt: achievement.seenAt || "",
+        }))
+    : [];
+}
+
+function evaluateAchievements() {
+  if (isEvaluatingAchievements) return 0;
+  isEvaluatingAchievements = true;
+  let unlockedCount = 0;
+
+  for (let pass = 0; pass < 5; pass += 1) {
+    let unlockedThisPass = 0;
+    const unlocked = getUnlockedAchievementMap();
+    const stats = getAchievementStats();
+
+    achievementDefinitions.forEach((achievement) => {
+      if (unlocked.has(achievement.id) || !achievement.condition(stats)) return;
+      unlockAchievement(achievement);
+      unlockedThisPass += 1;
+    });
+
+    unlockedCount += unlockedThisPass;
+    if (!unlockedThisPass) break;
+  }
+
+  isEvaluatingAchievements = false;
+  return unlockedCount;
+}
+
+function unlockAchievement(achievement) {
+  state.achievements = normalizeAchievements(state.achievements);
+  const unlockedAt = new Date().toISOString();
+  state.achievements.push({ id: achievement.id, unlockedAt, seenAt: "" });
+  if (!hasAchievementXpEvent(achievement.id)) {
+    state.xpEvents.push(createAchievementXpEvent(achievement.id, getAchievementXpReward(achievement), unlockedAt));
+  }
+  queueAchievementPopup(achievement.id);
+}
+
+function queueUnseenAchievements() {
+  normalizeAchievements(state.achievements).forEach((achievement) => {
+    if (!achievement.seenAt) queueAchievementPopup(achievement.id);
+  });
+}
+
+function queueAchievementPopup(achievementId) {
+  if (!achievementDefinitions.some((achievement) => achievement.id === achievementId)) return;
+  if (currentAchievementPopupId === achievementId || achievementPopupQueue.includes(achievementId)) return;
+  achievementPopupQueue.push(achievementId);
+}
+
+function showNextAchievementPopup() {
+  if (!achievementDialog || achievementDialog.open || !achievementPopupQueue.length) return;
+  const openDialog = document.querySelector("dialog[open]");
+  if (openDialog && openDialog !== achievementDialog) {
+    window.setTimeout(showNextAchievementPopup, 250);
+    return;
+  }
+  currentAchievementPopupId = achievementPopupQueue[0];
+  const achievement = getAchievementDefinition(currentAchievementPopupId);
+  if (!achievement) {
+    achievementPopupQueue.shift();
+    currentAchievementPopupId = null;
+    showNextAchievementPopup();
+    return;
+  }
+
+  document.querySelector("#achievementQueueCount").textContent =
+    achievementPopupQueue.length > 1 ? `Achievement unlocked 1 / ${achievementPopupQueue.length}` : "Achievement unlocked";
+  document.querySelector("#achievementPopupIcon").src = achievement.icon;
+  document.querySelector("#achievementPopupName").textContent = achievement.name;
+  document.querySelector("#achievementPopupDescription").textContent = achievement.description;
+  document.querySelector("#achievementPopupXp").textContent = `+${formatAchievementXp(achievement)}`;
+  achievementDialog.showModal();
+}
+
+function confirmCurrentAchievement() {
+  if (!currentAchievementPopupId) return;
+  markAchievementSeen(currentAchievementPopupId);
+  achievementPopupQueue.shift();
+  currentAchievementPopupId = null;
+  achievementDialog.close();
+  saveState();
+  renderApp();
+  showNextAchievementPopup();
+}
+
+function skipAchievementQueue() {
+  const seenAt = new Date().toISOString();
+  const queuedIds = new Set(achievementPopupQueue);
+  state.achievements = normalizeAchievements(state.achievements).map((achievement) =>
+    queuedIds.has(achievement.id) ? { ...achievement, seenAt: achievement.seenAt || seenAt } : achievement
+  );
+  achievementPopupQueue = [];
+  currentAchievementPopupId = null;
+  achievementDialog.close();
+  saveState();
+  renderApp();
+}
+
+function markAchievementSeen(achievementId) {
+  const seenAt = new Date().toISOString();
+  state.achievements = normalizeAchievements(state.achievements).map((achievement) =>
+    achievement.id === achievementId ? { ...achievement, seenAt: achievement.seenAt || seenAt } : achievement
+  );
+}
+
+function getUnlockedAchievementMap() {
+  return new Map(normalizeAchievements(state.achievements).map((achievement) => [achievement.id, achievement]));
+}
+
+function getAchievementDefinition(achievementId) {
+  return achievementDefinitions.find((achievement) => achievement.id === achievementId);
+}
+
+function getAchievementXpReward(achievement) {
+  return achievement.xpReward === "max-level" ? getMaxLevelTotalXp() : achievement.xpReward;
+}
+
+function formatAchievementXp(achievement) {
+  return achievement.hiddenXpReward ? "??? XP" : `${formatNumber(getAchievementXpReward(achievement))} XP`;
+}
+
+function hasAchievementXpEvent(achievementId) {
+  return state.xpEvents.some((event) => event.source === "achievement" && event.achievementId === achievementId);
+}
+
+function createAchievementXpEvent(achievementId, xp, earnedAt = new Date().toISOString()) {
+  return { id: createId(), source: "achievement", achievementId, xp, earnedAt };
+}
+
+function getAchievementStats() {
+  const allJobs = state.boards.flatMap((board) => board.jobs.map((job) => ensureJobCollections(job)));
+  const statusCounts = {};
+  const columnXpEvents = {};
+
+  defaultColumns.forEach((column) => {
+    statusCounts[column.id] = 0;
+    columnXpEvents[column.id] = 0;
+  });
+
+  allJobs.forEach((job) => {
+    statusCounts[job.status] = (statusCounts[job.status] || 0) + 1;
+  });
+
+  state.xpEvents.forEach((event) => {
+    if (!event.columnId) return;
+    columnXpEvents[event.columnId] = (columnXpEvents[event.columnId] || 0) + 1;
+  });
+
+  return {
+    totalJobs: allJobs.length,
+    boardCount: state.boards.length,
+    customColumnCount: state.boards.reduce((total, board) => total + getCustomColumns(board).length, 0),
+    statusCounts,
+    columnXpEvents,
+    contactCount: allJobs.reduce((total, job) => total + job.contacts.length, 0),
+    timelineEventCount: allJobs.reduce((total, job) => total + job.timeline.length, 0),
+    accountLevel: calculateLevel(calculateAccountXp()).level,
+  };
+}
+
 function ensureJobCollections(job) {
   job.timeline = normalizeTimeline(job.timeline);
   job.contacts = normalizeContacts(job.contacts);
@@ -1359,6 +1811,10 @@ function calculateVisibleXp() {
   if (state.settings.xpMode === "per-board") {
     return state.xpEvents.filter((event) => event.boardId === state.activeBoardId).reduce((total, event) => total + event.xp, 0);
   }
+  return calculateAccountXp();
+}
+
+function calculateAccountXp() {
   return state.xpEvents.reduce((total, event) => total + event.xp, 0);
 }
 
@@ -1376,6 +1832,14 @@ function calculateLevel(totalXp) {
   return { level: maxLevel, currentXp: 0, requiredXp: 0, percent: 100 };
 }
 
+function getMaxLevelTotalXp() {
+  let total = 0;
+  for (let level = 1; level < maxLevel; level += 1) {
+    total += getLevelRequirement(level);
+  }
+  return total;
+}
+
 function exportState() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -1391,8 +1855,11 @@ async function importState(event) {
   if (!file) return;
   try {
     state = migrateState(JSON.parse(await file.text()));
+    queueUnseenAchievements();
+    evaluateAchievements();
     saveState();
     renderApp();
+    showNextAchievementPopup();
   } catch {
     alert("That JSON file does not look like a HireLevel export.");
   } finally {
