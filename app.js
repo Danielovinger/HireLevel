@@ -77,6 +77,14 @@ const achievementDefinitions = [
     condition: (stats) => stats.totalJobs >= 50,
   },
   {
+    id: "tiny-net-wide-sea",
+    name: "Tiny Net, Wide Sea",
+    description: "Add 25 jobs.",
+    icon: "assets/achievements/tiny-net-wide-sea.png",
+    xpReward: 100,
+    condition: (stats) => stats.totalJobs >= 25,
+  },
+  {
     id: "spreadsheet-spirit",
     name: "Spreadsheet Spirit",
     description: "Add 100 jobs.",
@@ -101,6 +109,22 @@ const achievementDefinitions = [
     condition: (stats) => stats.statusCounts.saved >= 1,
   },
   {
+    id: "saved-hoarder",
+    name: "Saved Hoarder",
+    description: "Save 25 jobs.",
+    icon: "assets/achievements/saved-hoarder.png",
+    xpReward: 100,
+    condition: (stats) => stats.statusCounts.saved >= 25,
+  },
+  {
+    id: "maybe-later-means-never",
+    name: "Maybe Later Means Never",
+    description: "Save 50 jobs.",
+    icon: "assets/achievements/maybe-later-means-never.png",
+    xpReward: 250,
+    condition: (stats) => stats.statusCounts.saved >= 50,
+  },
+  {
     id: "sent-it",
     name: "Sent It",
     description: "Move a job to Applied.",
@@ -117,6 +141,30 @@ const achievementDefinitions = [
     condition: (stats) => stats.statusCounts["received-answer"] >= 1 || stats.columnXpEvents["received-answer"] >= 1,
   },
   {
+    id: "inbox-tremor",
+    name: "Inbox Tremor",
+    description: "Move 5 jobs to First Positive Answer.",
+    icon: "assets/achievements/inbox-tremor.png",
+    xpReward: 100,
+    condition: (stats) => stats.statusCounts["received-answer"] >= 5 || stats.columnXpEvents["received-answer"] >= 5,
+  },
+  {
+    id: "theyre-talking-back",
+    name: "They're Talking Back",
+    description: "Move 15 jobs to First Positive Answer.",
+    icon: "assets/achievements/theyre-talking-back.png",
+    xpReward: 250,
+    condition: (stats) => stats.statusCounts["received-answer"] >= 15 || stats.columnXpEvents["received-answer"] >= 15,
+  },
+  {
+    id: "signal-storm",
+    name: "Signal Storm",
+    description: "Move 30 jobs to First Positive Answer.",
+    icon: "assets/achievements/signal-storm.png",
+    xpReward: 1000,
+    condition: (stats) => stats.statusCounts["received-answer"] >= 30 || stats.columnXpEvents["received-answer"] >= 30,
+  },
+  {
     id: "interview-arc-begins",
     name: "Interview Arc Begins",
     description: "Move a job to Interviewing.",
@@ -125,12 +173,28 @@ const achievementDefinitions = [
     condition: (stats) => stats.statusCounts.interviewing >= 1 || stats.columnXpEvents.interviewing >= 1,
   },
   {
+    id: "interview-juggler",
+    name: "Interview Juggler",
+    description: "Move 5 jobs to Interviewing.",
+    icon: "assets/achievements/interview-juggler.png",
+    xpReward: 250,
+    condition: (stats) => stats.statusCounts.interviewing >= 5 || stats.columnXpEvents.interviewing >= 5,
+  },
+  {
     id: "offer-on-the-table",
     name: "Offer on the Table",
     description: "Move a job to Offer.",
     icon: "assets/achievements/offer-on-the-table.png",
     xpReward: 1000,
     condition: (stats) => stats.statusCounts.offer >= 1 || stats.columnXpEvents.offer >= 1,
+  },
+  {
+    id: "offer-collector",
+    name: "Offer Collector",
+    description: "Get 2 offers.",
+    icon: "assets/achievements/offer-collector.png",
+    xpReward: 1000,
+    condition: (stats) => stats.statusCounts.offer >= 2 || stats.columnXpEvents.offer >= 2,
   },
   {
     id: "not-this-one",
@@ -165,12 +229,28 @@ const achievementDefinitions = [
     condition: (stats) => stats.statusCounts.rejected >= 50 || stats.columnXpEvents.rejected >= 50,
   },
   {
+    id: "for-the-love-of-the-game",
+    name: "At this point I do this for the love of the game",
+    description: "Have 100 rejected jobs.",
+    icon: "assets/achievements/for-the-love-of-the-game.png",
+    xpReward: 1000,
+    condition: (stats) => stats.statusCounts.rejected >= 100 || stats.columnXpEvents.rejected >= 100,
+  },
+  {
     id: "which-one-of-you",
     name: "Which one of you was I talking to again?",
     description: "Move 20 jobs to Interviewing.",
     icon: "assets/achievements/which-one-of-you.png",
     xpReward: 1000,
     condition: (stats) => stats.statusCounts.interviewing >= 20 || stats.columnXpEvents.interviewing >= 20,
+  },
+  {
+    id: "calendar-full-soul-empty",
+    name: "Calendar Full, Soul Empty",
+    description: "Move 50 jobs to Interviewing.",
+    icon: "assets/achievements/calendar-full-soul-empty.png",
+    xpReward: 1000,
+    condition: (stats) => stats.statusCounts.interviewing >= 50 || stats.columnXpEvents.interviewing >= 50,
   },
   {
     id: "pipeline-builder",
@@ -181,6 +261,30 @@ const achievementDefinitions = [
     condition: (stats) => ["saved", "applied", "received-answer", "interviewing", "offer"].every((status) => stats.statusCounts[status] >= 1),
   },
   {
+    id: "the-board-breathes",
+    name: "The Board Breathes",
+    description: "Have jobs in every default column at the same time.",
+    icon: "assets/achievements/the-board-breathes.png",
+    xpReward: 250,
+    condition: (stats) => defaultColumns.every((column) => stats.statusCounts[column.id] >= 1),
+  },
+  {
+    id: "full-house",
+    name: "Full House",
+    description: "Have jobs in every default column at the same time, plus at least one custom column.",
+    icon: "assets/achievements/full-house.png",
+    xpReward: 500,
+    condition: (stats) => defaultColumns.every((column) => stats.statusCounts[column.id] >= 1) && stats.customColumnCount >= 1,
+  },
+  {
+    id: "green-glow-garden",
+    name: "Green Glow Garden",
+    description: "Have 50 jobs currently in Applied.",
+    icon: "assets/achievements/green-glow-garden.png",
+    xpReward: 250,
+    condition: (stats) => stats.statusCounts.applied >= 50,
+  },
+  {
     id: "board-architect",
     name: "Board Architect",
     description: "Create a second board.",
@@ -189,12 +293,68 @@ const achievementDefinitions = [
     condition: (stats) => stats.boardCount >= 2,
   },
   {
+    id: "second-board-energy",
+    name: "Second Board Energy",
+    description: "Create 3 boards.",
+    icon: "assets/achievements/second-board-energy.png",
+    xpReward: 100,
+    condition: (stats) => stats.boardCount >= 3,
+  },
+  {
+    id: "parallel-universes",
+    name: "Parallel Universes",
+    description: "Create 5 boards.",
+    icon: "assets/achievements/parallel-universes.png",
+    xpReward: 250,
+    condition: (stats) => stats.boardCount >= 5,
+  },
+  {
     id: "custom-workflow",
     name: "Custom Workflow",
     description: "Add your first custom column.",
     icon: "assets/achievements/custom-workflow.png",
     xpReward: 25,
     condition: (stats) => stats.customColumnCount >= 1,
+  },
+  {
+    id: "workflow-goblin",
+    name: "Workflow Goblin",
+    description: "Create 3 custom columns total.",
+    icon: "assets/achievements/workflow-goblin.png",
+    xpReward: 100,
+    condition: (stats) => stats.customColumnCount >= 3,
+  },
+  {
+    id: "process-engineer",
+    name: "Process Engineer",
+    description: "Create 10 custom columns across all boards.",
+    icon: "assets/achievements/process-engineer.png",
+    xpReward: 250,
+    condition: (stats) => stats.customColumnCount >= 10,
+  },
+  {
+    id: "fresh-paint",
+    name: "Fresh Paint",
+    description: "Change the board skin from Forest to another skin.",
+    icon: "assets/achievements/fresh-paint.png",
+    xpReward: 25,
+    condition: (stats) => stats.hasChangedBoardSkin,
+  },
+  {
+    id: "data-hoarder-but-healthy",
+    name: "Data Hoarder, But Healthy",
+    description: "Connect a JSON data file.",
+    icon: "assets/achievements/data-hoarder-but-healthy.png",
+    xpReward: 50,
+    condition: (stats) => stats.appEvents.has("data-file-connected"),
+  },
+  {
+    id: "backup-ritual",
+    name: "Backup Ritual",
+    description: "Export JSON once.",
+    icon: "assets/achievements/backup-ritual.png",
+    xpReward: 25,
+    condition: (stats) => stats.appEvents.has("json-exported"),
   },
   {
     id: "network-thread",
@@ -211,6 +371,22 @@ const achievementDefinitions = [
     icon: "assets/achievements/people-person.png",
     xpReward: 100,
     condition: (stats) => stats.contactCount >= 10,
+  },
+  {
+    id: "name-to-remember",
+    name: "Name to Remember",
+    description: "Add 25 contact log entries.",
+    icon: "assets/achievements/name-to-remember.png",
+    xpReward: 250,
+    condition: (stats) => stats.contactCount >= 25,
+  },
+  {
+    id: "professional-yapper",
+    name: "Professional Yapper",
+    description: "Add 50 contact log entries.",
+    icon: "assets/achievements/professional-yapper.png",
+    xpReward: 1000,
+    condition: (stats) => stats.contactCount >= 50,
   },
   {
     id: "historian",
@@ -235,6 +411,14 @@ const achievementDefinitions = [
     icon: "assets/achievements/historian-mythkeeper.png",
     xpReward: 1000,
     condition: (stats) => stats.timelineEventCount >= 250,
+  },
+  {
+    id: "lorekeeper",
+    name: "Lorekeeper",
+    description: "Record 500 timeline events.",
+    icon: "assets/achievements/lorekeeper.png",
+    xpReward: 1000,
+    condition: (stats) => stats.timelineEventCount >= 500,
   },
   {
     id: "why-are-you-still-here",
@@ -427,14 +611,14 @@ function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY) || LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
   if (!saved) {
     const board = createBoard("My Job Search", []);
-    return { version: 2, settings: getDefaultSettings(), activeBoardId: board.id, boards: [board], xpEvents: [], achievements: [] };
+    return { version: 2, settings: getDefaultSettings(), activeBoardId: board.id, boards: [board], xpEvents: [], achievements: [], appEvents: [] };
   }
 
   try {
     return migrateState(JSON.parse(saved));
   } catch {
     const board = createBoard("My Job Search", []);
-    return { version: 2, settings: getDefaultSettings(), activeBoardId: board.id, boards: [board], xpEvents: [], achievements: [] };
+    return { version: 2, settings: getDefaultSettings(), activeBoardId: board.id, boards: [board], xpEvents: [], achievements: [], appEvents: [] };
   }
 }
 
@@ -453,6 +637,7 @@ function migrateState(parsed) {
       boards: boards.length ? boards : [createBoard("My Job Search", [])],
       xpEvents: Array.isArray(parsed.xpEvents) ? parsed.xpEvents : [],
       achievements: normalizeAchievements(parsed.achievements),
+      appEvents: normalizeAppEvents(parsed.appEvents),
     };
   }
 
@@ -465,6 +650,7 @@ function migrateState(parsed) {
     boards: [legacyBoard],
     xpEvents: [],
     achievements: [],
+    appEvents: [],
   };
 
   legacyBoard.jobs.forEach((job) => {
@@ -656,6 +842,7 @@ async function initializeDataFile() {
     const loadedState = await readStateFromDataFile(dataFileHandle);
     if (loadedState) {
       state = loadedState;
+      recordAppEvent("data-file-connected");
       queueUnseenAchievements();
       evaluateAchievements();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -693,7 +880,11 @@ async function createDataFile() {
       return;
     }
     await saveStoredDataFileHandle(dataFileHandle);
+    recordAppEvent("data-file-connected");
     await writeStateToDataFile(dataFileHandle);
+    saveState();
+    renderApp();
+    showNextAchievementPopup();
     renderDataFileSettings(`Created data file: ${dataFileHandle.name}. Changes autosave to this file.`);
   } catch (error) {
     if (error?.name !== "AbortError") {
@@ -734,6 +925,7 @@ async function openDataFile() {
     dataFileHandle = handle;
     await saveStoredDataFileHandle(dataFileHandle);
     state = loadedState;
+    recordAppEvent("data-file-connected");
     queueUnseenAchievements();
     evaluateAchievements();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -768,6 +960,10 @@ async function saveDataFileNow() {
     }
     await writeStateToDataFile(dataFileHandle);
     await saveStoredDataFileHandle(dataFileHandle);
+    recordAppEvent("data-file-connected");
+    saveState();
+    renderApp();
+    showNextAchievementPopup();
     renderDataFileSettings(`Saved data file: ${dataFileHandle.name}.`);
   } catch (error) {
     console.warn("Could not save HireLevel data file", error);
@@ -1040,6 +1236,7 @@ function changeColorScheme(event) {
 
 function changeBoardSkin(event) {
   state.settings.boardSkin = event.target.value;
+  if (state.settings.boardSkin !== "forest") recordAppEvent("board-skin-changed");
   saveState();
   renderApp();
 }
@@ -1591,6 +1788,24 @@ function normalizeAchievements(achievements) {
     : [];
 }
 
+function normalizeAppEvents(appEvents) {
+  return Array.isArray(appEvents)
+    ? appEvents
+        .filter((event) => event && event.type)
+        .map((event) => ({
+          id: event.id || createId(),
+          type: cleanText(event.type),
+          at: event.at || new Date().toISOString(),
+        }))
+    : [];
+}
+
+function recordAppEvent(type) {
+  state.appEvents = normalizeAppEvents(state.appEvents);
+  if (state.appEvents.some((event) => event.type === type)) return;
+  state.appEvents.push({ id: createId(), type, at: new Date().toISOString() });
+}
+
 function evaluateAchievements() {
   if (isEvaluatingAchievements) return 0;
   isEvaluatingAchievements = true;
@@ -1721,6 +1936,7 @@ function getAchievementStats() {
   const allJobs = state.boards.flatMap((board) => board.jobs.map((job) => ensureJobCollections(job)));
   const statusCounts = {};
   const columnXpEvents = {};
+  const appEvents = new Set(normalizeAppEvents(state.appEvents).map((event) => event.type));
 
   defaultColumns.forEach((column) => {
     statusCounts[column.id] = 0;
@@ -1740,6 +1956,8 @@ function getAchievementStats() {
     totalJobs: allJobs.length,
     boardCount: state.boards.length,
     customColumnCount: state.boards.reduce((total, board) => total + getCustomColumns(board).length, 0),
+    hasChangedBoardSkin: state.settings.boardSkin !== "forest" || appEvents.has("board-skin-changed"),
+    appEvents,
     statusCounts,
     columnXpEvents,
     contactCount: allJobs.reduce((total, job) => total + job.contacts.length, 0),
@@ -1841,6 +2059,8 @@ function getMaxLevelTotalXp() {
 }
 
 function exportState() {
+  recordAppEvent("json-exported");
+  saveState();
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

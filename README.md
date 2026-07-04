@@ -11,7 +11,7 @@ HireLevel is a small offline-first job application board for organizing job-sear
 - Browser extension capture for supported logged-in job boards, including LinkedIn and Glassdoor.
 - Paste-and-parse fallback for blocked job pages.
 - Application XP, levels, progress meter, and title ranks.
-- Account-level achievements with XP rewards, popup unlocks, icons, and JSON persistence.
+- 50 account-level achievements with XP rewards, popup unlocks, icons, and JSON persistence.
 - Multiple job-search boards.
 - Global account XP or separate XP per board.
 - Board and progression reset controls with confirmation prompts.

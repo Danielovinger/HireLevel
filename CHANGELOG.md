@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.0.1 - 2026-07-05
+
+- Expanded the achievement set from 27 to 50 achievements.
+- Added new job volume, saved job, response, interview, reject, board, workflow, contact, and timeline achievement tiers.
+- Added app-usage achievements for changing board skins, connecting a JSON data file, and exporting JSON.
+- Added app event persistence so app-usage achievements can be saved and restored through JSON data.
+
 ## v2.0.0 - 2026-07-03
 
 - Added account-level achievements with icons, popup unlocks, JSON persistence, and backfill for existing saved data.
