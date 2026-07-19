@@ -8,7 +8,7 @@ HireLevel is a small offline-first job application board for organizing job-sear
 
 - Add a job from a manually entered URL.
 - Best-effort metadata fetching for job title, company, and description when the job page allows local browser reads.
-- Browser extension capture for supported logged-in job boards, including LinkedIn and Glassdoor.
+- Browser extension capture across LinkedIn, Glassdoor, and job pages that expose standard job metadata.
 - Paste-and-parse fallback for blocked job pages.
 - Application XP, levels, progress meter, and title ranks.
 - 50 account-level achievements with XP rewards, popup unlocks, icons, and JSON persistence.
@@ -29,10 +29,10 @@ HireLevel is a small offline-first job application board for organizing job-sear
 
 HireLevel has two capture paths:
 
-- Use the included Chrome/Edge extension for supported job boards such as LinkedIn and Glassdoor. The extension reads the job details from the page you are already viewing, then sends the captured job to your local HireLevel board.
+- Use the included Chrome/Edge extension on LinkedIn, Glassdoor, and other job pages. It reads the page you are viewing, prioritizes standard `JobPosting` metadata when available, then sends the captured job to your local HireLevel board.
 - Use the app's manual URL form for other job sites. If a page blocks direct local reading with CORS rules, HireLevel fills what it can from the URL and leaves the fields editable so you can paste the missing title, company, or description.
 
-Company icons are captured by the extension when the job board exposes them. For manual URL entries, HireLevel tries the job site's `/favicon.ico` when available. If you are offline or the icon cannot load, the card falls back to company initials.
+Company icons captured by the extension are resized and embedded in HireLevel's local data, including JSON exports, so expiring image links cannot remove them later. Existing remote icons are cached locally when possible. If an icon is unavailable, the card falls back to company initials instead of showing an empty image.
 
 ## XP Rules
 
@@ -106,7 +106,7 @@ Then open `http://localhost:8080`.
 
 ## Browser Extension
 
-The `extension/` folder contains an unpacked Chrome/Edge extension that can capture LinkedIn and Glassdoor job details.
+The `extension/` folder contains an unpacked Chrome/Edge extension that captures LinkedIn and Glassdoor directly and supports many other career sites through standard job-page metadata and semantic page content.
 
 To install it locally:
 
@@ -115,18 +115,20 @@ To install it locally:
 3. Choose **Load unpacked**.
 4. Select the `extension/` folder.
 
-On supported job pages, choose whether the job should start as **Applied** or **Saved**, then click **Add to HireLevel**. If the extension knows about multiple boards, it will also ask which board to use. If it only knows one board, it captures directly for that board. Saved captures do not grant XP. Applied captures grant the normal 5 XP once. If the tracker has not been opened yet, the extension queues the job and the tracker imports it when opened.
+On a recognized job page, choose whether the job should start as **Applied** or **Saved**, then click **Add to HireLevel**. If the widget does not appear automatically, open the extension and choose **Show capture widget on this page**. If the extension knows about multiple boards, it will also ask which board to use. If it only knows one board, it captures directly for that board. Saved captures do not grant XP. Applied captures grant the normal 5 XP once. If the tracker has not been opened yet, the extension queues the job and the tracker imports it when opened.
 
-Automatic extension capture currently supports:
+Dedicated capture logic is included for:
 
 - LinkedIn
 - Glassdoor
 
-Other job boards can still be tracked manually with URL entry and pasted job text.
+Other career sites are captured using standard `JobPosting` structured data first, then common job-title, company, description, logo, and canonical-link patterns. Sites with unusual or protected page structures can still be tracked with URL entry and pasted job text.
 
 If a captured job is already on the selected board, the extension reports **Job already exists** instead of creating a duplicate.
 
-For the packaged Windows download, open `HireLevel.html` first, then enable **Allow access to file URLs** for the extension in the browser's extension details page. This lets the extension sync supported LinkedIn and Glassdoor captures into the local tracker.
+For the packaged Windows download, open `HireLevel.html` first, then enable **Allow access to file URLs** for the extension in the browser's extension details page. This lets the extension sync captures into the local tracker.
+
+Because job capture can run across career sites and cache their company logos locally, Chrome or Edge will show that the extension can read pages on websites. HireLevel uses that access inside the browser to recognize job pages, perform captures, and download logo images into local data. It does not upload page contents, job data, or browsing activity.
 
 After pulling updates, click the extension reload button in `chrome://extensions` or `edge://extensions`, then refresh any open LinkedIn and HireLevel tabs.
 
@@ -139,7 +141,6 @@ Tracker data is saved locally. By default, HireLevel uses browser storage. In Ch
 - CSV export.
 - Reminders and follow-up dates.
 - Archive view.
-- Better company logo handling.
 
 ## Acknowledgments
 

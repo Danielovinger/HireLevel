@@ -1,5 +1,17 @@
 const logElement = document.querySelector("#log");
 const clearButton = document.querySelector("#clearLog");
+const showCaptureButton = document.querySelector("#showCapture");
+
+showCaptureButton.addEventListener("click", async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "HIRELEVEL_SHOW_CAPTURE" });
+    window.close();
+  } catch {
+    showCaptureButton.textContent = "Open a normal job page first";
+  }
+});
 
 clearButton.addEventListener("click", async () => {
   await chrome.storage.local.remove("hireLevelDebugLog");

@@ -465,6 +465,7 @@ let isEvaluatingAchievements = false;
 let dataFileHandle = null;
 let dataFileSavePromise = null;
 let dataFileSaveQueued = false;
+let logoCacheRequestSent = false;
 
 const board = document.querySelector("#board");
 const columnTemplate = document.querySelector("#columnTemplate");
@@ -535,6 +536,7 @@ jobForm.addEventListener("submit", (event) => {
     source: existingJob?.source || "",
     externalId: existingJob?.externalId || "",
     companyLogoUrl: existingJob?.companyLogoUrl || "",
+    companyLogoDataUrl: existingJob?.companyLogoDataUrl || "",
     timeline: normalizeTimeline(existingJob?.timeline),
     contacts: normalizeContacts(existingJob?.contacts),
   };
@@ -1099,11 +1101,7 @@ function renderCard(job) {
   renderContactLog(card.querySelector(".contact-list"), job.contacts);
   renderTimeline(card.querySelector(".timeline-list"), job.timeline);
 
-  icon.textContent = initials(job.company);
-  if (faviconUrl) {
-    icon.style.backgroundImage = `url("${faviconUrl}")`;
-    icon.textContent = "";
-  }
+  renderCompanyIcon(icon, job.company, faviconUrl);
 
   summary.addEventListener("click", () => {
     details.hidden = !details.hidden;
@@ -1345,6 +1343,11 @@ function handleExtensionMessage(event) {
   if (event.data?.source !== "hirelevel-extension") return;
   if (event.data?.type === "REQUEST_BOARD_SYNC") {
     syncExtensionBoardList();
+    requestRemoteLogoCache();
+    return;
+  }
+  if (event.data?.type === "CACHED_LOGOS") {
+    applyCachedLogos(event.data.logos);
     return;
   }
   if (event.data?.type !== "ADD_JOBS") return;
@@ -1380,7 +1383,8 @@ function addCapturedJob(rawJob) {
       url: job.url,
       source: job.source,
       externalId: job.externalId,
-      companyLogoUrl: job.companyLogoUrl,
+      companyLogoUrl: job.companyLogoUrl || existing.companyLogoUrl || "",
+      companyLogoDataUrl: job.companyLogoDataUrl || existing.companyLogoDataUrl || "",
       timeline: normalizeTimeline(existing.timeline),
       contacts: normalizeContacts(existing.contacts),
       id: existing.id,
@@ -1406,6 +1410,7 @@ function normalizeCapturedJob(rawJob) {
   const source = cleanText(rawJob?.source);
   const externalId = cleanText(rawJob?.externalId);
   const companyLogoUrl = cleanText(rawJob?.companyLogoUrl);
+  const companyLogoDataUrl = normalizeImageDataUrl(rawJob?.companyLogoDataUrl);
   const status = normalizeInitialCaptureStatus(rawJob?.status);
   if (!title || !company) return null;
   return {
@@ -1417,6 +1422,7 @@ function normalizeCapturedJob(rawJob) {
     source,
     externalId,
     companyLogoUrl,
+    companyLogoDataUrl,
     dateApplied: new Date().toISOString().slice(0, 10),
     status,
     notes: "Captured from browser extension.",
@@ -1433,6 +1439,43 @@ function normalizeCapturedJob(rawJob) {
 
 function normalizeInitialCaptureStatus(status) {
   return status === "saved" ? "saved" : "applied";
+}
+
+function requestRemoteLogoCache() {
+  if (logoCacheRequestSent) return;
+  const logos = state.boards.flatMap((board) =>
+    board.jobs
+      .map((job) => ({
+        job,
+        url: job.companyLogoUrl || (!isLinkedInUrl(job.url) ? getFaviconUrl(job.url) : ""),
+      }))
+      .filter(({ job, url }) => !normalizeImageDataUrl(job.companyLogoDataUrl) && /^https?:\/\//i.test(url))
+      .map(({ job, url }) => ({ jobId: job.id, url }))
+  );
+  if (!logos.length) return;
+  logoCacheRequestSent = true;
+  window.postMessage({ source: "hirelevel-app", type: "CACHE_LOGOS", logos }, "*");
+}
+
+function applyCachedLogos(logos) {
+  const byJobId = new Map(
+    (Array.isArray(logos) ? logos : [])
+      .map((item) => [cleanText(item?.jobId), normalizeImageDataUrl(item?.dataUrl)])
+      .filter(([jobId, dataUrl]) => jobId && dataUrl)
+  );
+  if (!byJobId.size) return;
+  let changed = false;
+  state.boards.forEach((board) => {
+    board.jobs.forEach((job) => {
+      const dataUrl = byJobId.get(job.id);
+      if (!dataUrl || job.companyLogoDataUrl === dataUrl) return;
+      job.companyLogoDataUrl = dataUrl;
+      changed = true;
+    });
+  });
+  if (!changed) return;
+  saveState();
+  renderApp();
 }
 
 function getJobIdentity(job) {
@@ -2355,9 +2398,36 @@ function initials(company) {
 }
 
 function getCompanyIconUrl(job) {
+  if (normalizeImageDataUrl(job.companyLogoDataUrl)) return job.companyLogoDataUrl;
   if (job.companyLogoUrl) return job.companyLogoUrl;
   if (isLinkedInUrl(job.url)) return "";
   return getFaviconUrl(job.url);
+}
+
+function renderCompanyIcon(container, company, imageUrl) {
+  const fallback = initials(company);
+  container.replaceChildren();
+  container.style.backgroundImage = "";
+  container.textContent = fallback;
+  if (!imageUrl) return;
+
+  const image = document.createElement("img");
+  image.alt = "";
+  image.decoding = "async";
+  image.addEventListener("load", () => {
+    container.textContent = "";
+    container.replaceChildren(image);
+  });
+  image.addEventListener("error", () => {
+    image.remove();
+    container.textContent = fallback;
+  });
+  image.src = imageUrl;
+}
+
+function normalizeImageDataUrl(value) {
+  const dataUrl = cleanText(value);
+  return /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(dataUrl) ? dataUrl : "";
 }
 
 function isLinkedInUrl(url) {

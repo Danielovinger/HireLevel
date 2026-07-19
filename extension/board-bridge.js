@@ -10,6 +10,12 @@
 async function handleAppMessage(event) {
   if (event.source !== window) return;
   if (event.data?.source !== "hirelevel-app") return;
+  if (event.data?.type === "CACHE_LOGOS") {
+    const logos = Array.isArray(event.data.logos) ? event.data.logos : [];
+    const cached = await cacheLogos(logos);
+    window.postMessage({ source: "hirelevel-extension", type: "CACHED_LOGOS", logos: cached }, "*");
+    return;
+  }
   if (event.data?.type === "IMPORT_RESULT") {
     const results = Array.isArray(event.data.results) ? event.data.results : [];
     await writeDebugLog({ type: "board-import-result", results });
@@ -35,6 +41,28 @@ async function handleAppMessage(event) {
     hireLevelActiveBoardId: event.data.activeBoardId || boards[0]?.id || null,
     hireLevelTheme: event.data.theme || null,
   });
+}
+
+async function cacheLogos(logos) {
+  const valid = logos
+    .map((item) => ({ jobId: String(item?.jobId || ""), url: String(item?.url || "") }))
+    .filter((item) => item.jobId && /^https?:\/\//i.test(item.url));
+  const results = [];
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < valid.length) {
+      const item = valid[nextIndex];
+      nextIndex += 1;
+      try {
+        const response = await chrome.runtime.sendMessage({ type: "HIRELEVEL_CACHE_IMAGE", url: item.url });
+        if (response?.ok && response.dataUrl) results.push({ jobId: item.jobId, dataUrl: response.dataUrl });
+      } catch {}
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(4, valid.length) }, worker));
+  return results;
 }
 
 async function importPendingJobs() {

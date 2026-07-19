@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.0 - 2026-07-19
+
+- Expanded browser-extension capture beyond LinkedIn and Glassdoor using standard JobPosting metadata and semantic page fallbacks.
+- Improved LinkedIn capture across classic search, AI-powered search, collections, and job-detail views by following the selected job card and active details panel.
+- Added a popup command to show the HireLevel capture widget manually on unrecognized job pages.
+- Added local company-logo caching with compact embedded images that persist in HireLevel data and JSON exports.
+- Added automatic migration for existing valid logo URLs and reliable company-initial fallbacks for unavailable images.
+- Updated extension permissions, capture logs, packaged instructions, and public documentation for the wider job-site support.
+
 ## v2.0.1 - 2026-07-05
 
 - Expanded the achievement set from 27 to 50 achievements.

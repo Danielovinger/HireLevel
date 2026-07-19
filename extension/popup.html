@@ -28,6 +28,11 @@
         padding: 8px 10px;
       }
 
+      #showCapture {
+        width: 100%;
+        margin-bottom: 8px;
+      }
+
       #log {
         display: grid;
         gap: 10px;
@@ -53,6 +58,7 @@
   </head>
   <body>
     <h1>HireLevel Capture Log</h1>
+    <button id="showCapture" type="button">Show capture widget on this page</button>
     <button id="clearLog" type="button">Clear Log</button>
     <div id="log"></div>
     <script src="popup.js"></script>

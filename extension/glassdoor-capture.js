@@ -11,10 +11,17 @@
   init();
 
   async function init() {
+    chrome.runtime.onMessage.addListener(handleRuntimeMessage);
     await addCaptureControls();
     document.addEventListener("click", handleDocumentClick, true);
     chrome.storage.onChanged.addListener(handleStorageChange);
     observePageChanges();
+  }
+
+  function handleRuntimeMessage(message, _sender, sendResponse) {
+    if (message?.type !== "HIRELEVEL_SHOW_CAPTURE") return undefined;
+    addCaptureControls().then(() => sendResponse({ ok: true }));
+    return true;
   }
 
   function handleDocumentClick(event) {
@@ -162,7 +169,16 @@
     const selectedBoard = boards.find((board) => board.id === selectedBoardId);
     const status = getSelectedInitialStatus();
     selectedStatusMemory = status;
-    const job = { ...scrapeGlassdoorJob(), captureId, boardId: selectedBoardId, boardName: selectedBoard?.name || "", status };
+    const scrapedJob = scrapeGlassdoorJob();
+    const companyLogoDataUrl = await cacheCompanyLogo(scrapedJob.companyLogoUrl);
+    const job = {
+      ...scrapedJob,
+      companyLogoDataUrl,
+      captureId,
+      boardId: selectedBoardId,
+      boardName: selectedBoard?.name || "",
+      status,
+    };
     await writeDebugLog({ type: "capture-clicked", source: "glassdoor", captureId, url: location.href, job });
 
     if (!job.title || !job.company) {
@@ -629,8 +645,13 @@
   async function writeDebugLog(entry) {
     const { hireLevelDebugLog = [] } = await safeStorageGet("hireLevelDebugLog");
     const nextLog = Array.isArray(hireLevelDebugLog) ? hireLevelDebugLog.slice(-24) : [];
-    nextLog.push({ ...entry, at: new Date().toISOString() });
+    nextLog.push(sanitizeLogEntry({ ...entry, at: new Date().toISOString() }));
     await safeStorageSet({ hireLevelDebugLog: nextLog });
+  }
+
+  function sanitizeLogEntry(entry) {
+    if (!entry?.job?.companyLogoDataUrl) return entry;
+    return { ...entry, job: { ...entry.job, companyLogoDataUrl: "[embedded image]" } };
   }
 
   async function safeStorageGet(keys) {
@@ -649,6 +670,16 @@
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async function cacheCompanyLogo(url) {
+    if (!url || typeof chrome === "undefined" || !chrome.runtime?.id) return "";
+    try {
+      const response = await chrome.runtime.sendMessage({ type: "HIRELEVEL_CACHE_IMAGE", url });
+      return response?.ok && typeof response.dataUrl === "string" ? response.dataUrl : "";
+    } catch {
+      return "";
     }
   }
 

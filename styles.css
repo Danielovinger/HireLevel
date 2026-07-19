@@ -569,6 +569,13 @@ textarea {
   background-position: center;
 }
 
+.company-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .card-text {
   display: grid;
   gap: 5px;

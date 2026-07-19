@@ -40,10 +40,11 @@ Install the browser extension:
 Use the extension:
 
 1. Open HireLevel.html so the extension can learn your boards.
-2. Open a supported job page on LinkedIn or Glassdoor.
-3. Choose the board.
-4. Choose whether to add the job as Applied or Saved Jobs.
-5. Click Add to HireLevel.
+2. Open a job page on LinkedIn, Glassdoor, or another career site.
+3. If the capture widget does not appear automatically, open the HireLevel Capture extension and click Show capture widget on this page.
+4. Choose the board.
+5. Choose whether to add the job as Applied or Saved Jobs.
+6. Click Add to HireLevel.
 
 Notes:
 
