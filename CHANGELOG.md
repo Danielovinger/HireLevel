@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.1.1 - 2026-07-21
+
+- Prevented LinkedIn controls such as Save and Applied now from being captured as job titles after an application is submitted.
+- Restricted selected-card tracking to the actual LinkedIn search-results list instead of the application detail panel.
+- Expanded LinkedIn description capture using current semantic containers, the visible About the job section, and matching JobPosting metadata.
+
 ## v2.1.0 - 2026-07-19
 
 - Expanded browser-extension capture beyond LinkedIn and Glassdoor using standard JobPosting metadata and semantic page fallbacks.

@@ -295,6 +295,8 @@
 
   function scrapeLinkedInJob() {
     const detailPane = getDetailPane();
+    const structuredJob = findStructuredJobPosting();
+    const structuredCompany = cleanCompany(structuredJob?.hiringOrganization?.name || "");
     const companySelectorCandidate = cleanCompany(
       textFromSelectorsIn(detailPane, [
         ".job-details-jobs-unified-top-card__company-name a",
@@ -306,11 +308,16 @@
         "a[href*='/company/']",
       ])
     );
-    const companyFromPane = (isLikelyCompanyLine(companySelectorCandidate) ? companySelectorCandidate : "") || inferCompanyFromPane(detailPane);
+    const companyFromPane =
+      (isLikelyCompanyLine(companySelectorCandidate) ? companySelectorCandidate : "") ||
+      inferCompanyFromPane(detailPane) ||
+      (isLikelyCompanyLine(structuredCompany) ? structuredCompany : "");
     const selectedCard = getSelectedJobCard(companyFromPane);
-    const company = companyFromPane || inferCompanyFromCard(selectedCard);
+    const company = companyFromPane || inferCompanyFromCard(selectedCard) || structuredCompany;
     const title = firstLikelyJobTitle([
       ...textsFromSelectorsIn(detailPane, [
+        "[data-testid*='job-title' i]",
+        "[data-test*='job-title' i]",
         ".job-details-jobs-unified-top-card__job-title h1",
         ".job-details-jobs-unified-top-card__job-title",
         ".jobs-unified-top-card__job-title h1",
@@ -321,16 +328,11 @@
         "h1",
       ]),
       inferTitleFromPane(detailPane, company),
+      structuredJob?.title,
       inferTitleFromCard(selectedCard),
       inferTitleFromDocumentMetadata(),
     ]);
-    const descriptionElement = getDescriptionElement();
-    const description = textFromSelectorsIn(detailPane, [
-      ".jobs-description__content",
-      ".jobs-box__html-content",
-      "#job-details",
-      ".jobs-description-content__text",
-    ]) || getCleanLines(descriptionElement).join("\n") || inferDescriptionFromPane(detailPane);
+    const description = extractDescription(detailPane, structuredJob);
     const companyLogoUrl = inferCompanyLogoUrl(detailPane, selectedCard, company);
     return {
       title,
@@ -378,7 +380,13 @@
   function rememberSelectedJobCard(event) {
     const target = event.target instanceof Element ? event.target : null;
     if (!target || target.closest(`#${wrapperId}`)) return;
-    const card = findCardContainer(target);
+    const resultsRoot = target.closest(
+      ".jobs-search-results-list, .scaffold-layout__list, [class*='jobs-search-results']"
+    );
+    if (!resultsRoot) return;
+    const card = target.closest(
+      ".jobs-search-results-list__list-item, .jobs-search-results__list-item, .job-card-container, [data-view-name='job-card'], [data-occludable-job-id], [data-job-id], li[role='listitem']"
+    );
     if (!card || !isVisible(card)) return;
     const hasJobMarker = Boolean(
       card.matches("[data-occludable-job-id], [data-job-id], [data-view-name='job-card']") ||
@@ -419,17 +427,33 @@
   }
 
   function getDescriptionElement() {
-    const knownDescription = Array.from(
-      document.querySelectorAll(
-        ".jobs-description__content, .jobs-box__html-content, #job-details, .jobs-description-content__text"
-      )
-    ).find(isVisible);
-    if (knownDescription) return knownDescription;
+    const selectors = [
+      ".jobs-description__content",
+      ".jobs-box__html-content",
+      "#job-details",
+      ".jobs-description-content__text",
+      "[data-testid*='job-description' i]",
+      "[data-test*='job-description' i]",
+      "[class*='jobs-description' i]",
+      "[class*='job-description' i]",
+    ];
+    for (const selector of selectors) {
+      const match = Array.from(document.querySelectorAll(selector)).find(
+        (element) => isVisible(element) && cleanText(element.innerText || element.textContent || "").length >= 80
+      );
+      if (match) return match;
+    }
 
-    const aboutHeading = Array.from(document.querySelectorAll("h2, h3, [role='heading']")).find(
+    const aboutHeading = Array.from(document.querySelectorAll("h1, h2, h3, h4, [role='heading'], span")).find(
       (element) => isVisible(element) && cleanText(element.innerText || element.textContent || "").toLowerCase() === "about the job"
     );
-    return aboutHeading?.closest("section") || aboutHeading?.parentElement || null;
+    if (!aboutHeading) return null;
+    let candidate = aboutHeading.closest("section") || aboutHeading.parentElement;
+    for (let depth = 0; candidate && depth < 5; depth += 1, candidate = candidate.parentElement) {
+      const textLength = cleanText(candidate.innerText || candidate.textContent || "").length;
+      if (textLength >= 100 && textLength <= 50000) return candidate;
+    }
+    return aboutHeading.parentElement;
   }
 
   function findJobCardById(jobId) {
@@ -437,7 +461,7 @@
       document.querySelector(".jobs-search-results-list") ||
       document.querySelector(".scaffold-layout__list") ||
       document.querySelector("[class*='jobs-search-results']");
-    const roots = [resultsRoot, document].filter(Boolean);
+    const roots = resultsRoot ? [resultsRoot] : [document];
     const selectors = [
       `[data-occludable-job-id="${jobId}"]`,
       `[data-job-id="${jobId}"]`,
@@ -512,7 +536,6 @@
       card.querySelector("[data-view-name='job-card'] a")?.innerText,
       card.querySelector("a[href*='/jobs/view/']")?.innerText,
       card.querySelector("a[href*='currentJobId=']")?.innerText,
-      card.querySelector("strong")?.innerText,
     ]);
   }
 
@@ -570,6 +593,12 @@
       "premium",
       "how promoted jobs are ranked",
       "search all jobs",
+      "save",
+      "saved",
+      "apply",
+      "easy apply",
+      "applied",
+      "applied now",
     ];
     if (blockedTitles.includes(lower)) return false;
     if (/^(are|were) these (search )?results helpful\b/.test(lower)) return false;
@@ -631,6 +660,74 @@
     return lines.slice(start + 1).filter(isLikelyDescriptionLine).join("\n");
   }
 
+  function extractDescription(detailPane, structuredJob) {
+    const descriptionElement = getDescriptionElement();
+    const elementDescription = cleanDescriptionLines(getCleanLines(descriptionElement));
+    if (elementDescription) return elementDescription;
+
+    const paneDescription = inferDescriptionFromPane(detailPane);
+    if (paneDescription) return paneDescription;
+
+    return cleanStructuredDescription(structuredJob?.description || "");
+  }
+
+  function cleanDescriptionLines(lines) {
+    if (!lines.length) return "";
+    const aboutIndex = lines.findIndex((line) => line.toLowerCase() === "about the job");
+    const start = aboutIndex >= 0 ? aboutIndex + 1 : 0;
+    const stopLabels = new Set([
+      "people you can reach out to",
+      "meet the hiring team",
+      "similar jobs",
+      "job seeker insights",
+    ]);
+    const selected = [];
+    for (const line of lines.slice(start)) {
+      if (stopLabels.has(line.toLowerCase())) break;
+      if (isLikelyDescriptionLine(line)) selected.push(line);
+    }
+    const description = selected.join("\n").trim();
+    return description.length >= 40 ? description : "";
+  }
+
+  function cleanStructuredDescription(value) {
+    if (!value) return "";
+    const container = document.createElement("div");
+    container.innerHTML = String(value);
+    return cleanText(container.innerText || container.textContent || "");
+  }
+
+  function findStructuredJobPosting() {
+    const currentJobId = getCurrentLinkedInJobId();
+    const postings = [];
+    for (const script of document.querySelectorAll("script[type='application/ld+json']")) {
+      try {
+        collectStructuredJobPostings(JSON.parse(script.textContent || "null"), postings);
+      } catch {}
+    }
+    if (!postings.length) return null;
+    if (currentJobId) {
+      const matching = postings.find((posting) =>
+        cleanText(`${posting?.url || ""} ${posting?.identifier?.value || posting?.identifier || ""}`).includes(currentJobId)
+      );
+      if (matching) return matching;
+    }
+    return postings.length === 1 ? postings[0] : null;
+  }
+
+  function collectStructuredJobPostings(value, postings) {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => collectStructuredJobPostings(item, postings));
+      return;
+    }
+    if (typeof value !== "object") return;
+    const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
+    if (types.some((type) => String(type || "").toLowerCase() === "jobposting")) postings.push(value);
+    collectStructuredJobPostings(value["@graph"], postings);
+    collectStructuredJobPostings(value.mainEntity, postings);
+  }
+
   function inferCompanyLogoUrl(detailPane, selectedCard, company = "") {
     const cardImage = selectedCard?.querySelector("img[src], img[data-delayed-url]");
     const cardSrc = getImageSource(cardImage);
@@ -676,7 +773,7 @@
     if (/^\(?\d+\)?\s+results?$/.test(lower)) return false;
     if (lower.includes("tel aviv") || lower.includes("hybrid") || lower.includes("remote")) return false;
     if (lower.includes("applied") || lower.includes("week ago") || lower.includes("month ago")) return false;
-    if (["premium", "application status", "application submitted", "on-site", "full-time", "part-time", "contract"].includes(lower)) return false;
+    if (["premium", "application status", "application submitted", "save", "saved", "apply", "easy apply", "applied", "applied now", "on-site", "full-time", "part-time", "contract"].includes(lower)) return false;
     return true;
   }
 
