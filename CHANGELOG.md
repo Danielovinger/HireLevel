@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.0 - 2026-07-28
+
+- Added an optional job-specific note field to LinkedIn, Glassdoor, and generic capture widgets.
+- Saved capture notes directly into the matching HireLevel job card and included them in local data and JSON exports.
+- Kept notes through harmless widget refreshes, cleared them when changing jobs, and cleared them after successful capture.
+- Adjusted widget positioning so the larger capture form remains fully visible on screen.
+
 ## v2.1.1 - 2026-07-21
 
 - Prevented LinkedIn controls such as Save and Applied now from being captured as job titles after an application is submitted.

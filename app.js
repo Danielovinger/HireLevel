@@ -1411,6 +1411,7 @@ function normalizeCapturedJob(rawJob) {
   const externalId = cleanText(rawJob?.externalId);
   const companyLogoUrl = cleanText(rawJob?.companyLogoUrl);
   const companyLogoDataUrl = normalizeImageDataUrl(rawJob?.companyLogoDataUrl);
+  const capturedNote = normalizeCapturedNote(rawJob?.notes);
   const status = normalizeInitialCaptureStatus(rawJob?.status);
   if (!title || !company) return null;
   return {
@@ -1425,7 +1426,7 @@ function normalizeCapturedJob(rawJob) {
     companyLogoDataUrl,
     dateApplied: new Date().toISOString().slice(0, 10),
     status,
-    notes: "Captured from browser extension.",
+    notes: capturedNote || "Captured from browser extension.",
     timeline: [
       createTimelineEvent(
         "created",
@@ -1439,6 +1440,10 @@ function normalizeCapturedJob(rawJob) {
 
 function normalizeInitialCaptureStatus(status) {
   return status === "saved" ? "saved" : "applied";
+}
+
+function normalizeCapturedNote(value) {
+  return String(value || "").replace(/\r\n/g, "\n").trim().slice(0, 5000);
 }
 
 function requestRemoteLogoCache() {

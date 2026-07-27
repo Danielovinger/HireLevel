@@ -44,7 +44,8 @@ Use the extension:
 3. If the capture widget does not appear automatically, open the HireLevel Capture extension and click Show capture widget on this page.
 4. Choose the board.
 5. Choose whether to add the job as Applied or Saved Jobs.
-6. Click Add to HireLevel.
+6. Optionally enter a job-specific note.
+7. Click Add to HireLevel.
 
 Notes:
 

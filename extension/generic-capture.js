@@ -5,8 +5,10 @@
   const buttonId = "hirelevel-capture";
   const selectId = "hirelevel-board-select";
   const statusSelectId = "hirelevel-status-select";
+  const noteInputId = "hirelevel-note-input";
   let selectedBoardMemory = "";
   let selectedStatusMemory = "applied";
+  let noteMemory = "";
   let latestCaptureId = "";
   let forceWidget = false;
 
@@ -102,6 +104,9 @@
     });
     wrapper.appendChild(statusSelect);
 
+    wrapper.appendChild(createFieldLabel("Job note (optional)", theme));
+    wrapper.appendChild(createNoteInput(theme));
+
     const button = document.createElement("button");
     button.id = buttonId;
     button.type = "button";
@@ -122,6 +127,7 @@
     button.addEventListener("click", captureCurrentJob);
     wrapper.appendChild(button);
     document.body.appendChild(wrapper);
+    keepWidgetInViewport(wrapper);
   }
 
   function observePageChanges() {
@@ -131,6 +137,7 @@
       if (location.href !== lastUrl) {
         lastUrl = location.href;
         forceWidget = false;
+        clearCaptureNote();
         document.getElementById(wrapperId)?.remove();
       }
       if (document.getElementById(wrapperId)) return;
@@ -155,6 +162,7 @@
     const selectedBoard = boards.find((board) => board.id === selectedBoardId);
     const status = getSelectedInitialStatus();
     selectedStatusMemory = status;
+    const notes = getCaptureNote();
     const scrapedJob = scrapeGenericJob();
     const companyLogoDataUrl = await cacheCompanyLogo(scrapedJob.companyLogoUrl);
     const job = {
@@ -164,6 +172,7 @@
       boardId: selectedBoardId,
       boardName: selectedBoard?.name || "",
       status,
+      notes,
     };
     await writeDebugLog({ type: "capture-clicked", source: job.source, captureId, url: location.href, job });
 
@@ -192,6 +201,7 @@
       const stored = await safeStorageSet({ [getPendingJobKey(captureId)]: job });
       if (!stored) throw new Error("Extension storage is unavailable. Reload the page after reloading the extension.");
       await writeDebugLog({ type: "capture-succeeded", source: job.source, captureId, url: location.href, job });
+      clearCaptureNote();
       flash(button, selectedBoard ? `Captured for ${selectedBoard.name}` : "Captured. Open tracker.", "#176c42");
     } catch (error) {
       await writeDebugLog({
@@ -506,6 +516,49 @@
     label.textContent = text;
     label.style.cssText = `color:${theme.accentDark};font-size:12px;font-weight:800;line-height:14px;margin:2px 0 -4px;padding:0 2px`;
     return label;
+  }
+
+  function createNoteInput(theme) {
+    const input = document.createElement("textarea");
+    input.id = noteInputId;
+    input.value = noteMemory;
+    input.placeholder = "Add context, referral details, or a reminder";
+    input.maxLength = 2000;
+    input.rows = 3;
+    input.style.cssText = [
+      `border:1px solid ${theme.accentDark}`,
+      "border-radius:8px",
+      `background:${theme.panel}`,
+      `color:${theme.ink}`,
+      "width:220px",
+      "height:76px",
+      "padding:10px 12px",
+      "box-sizing:border-box",
+      "font:400 13px/18px system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      "resize:none",
+    ].join(";");
+    input.addEventListener("input", () => {
+      noteMemory = input.value;
+    });
+    return input;
+  }
+
+  function getCaptureNote() {
+    return String(document.getElementById(noteInputId)?.value ?? noteMemory).trim().slice(0, 2000);
+  }
+
+  function clearCaptureNote() {
+    noteMemory = "";
+    const input = document.getElementById(noteInputId);
+    if (input) input.value = "";
+  }
+
+  function keepWidgetInViewport(wrapper) {
+    window.requestAnimationFrame(() => {
+      const rect = wrapper.getBoundingClientRect();
+      wrapper.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - wrapper.offsetWidth - 12))}px`;
+      wrapper.style.top = `${Math.max(12, Math.min(rect.top, window.innerHeight - wrapper.offsetHeight - 12))}px`;
+    });
   }
 
   function getSelectedInitialStatus() {

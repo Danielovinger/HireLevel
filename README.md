@@ -8,7 +8,7 @@ HireLevel is a small offline-first job application board for organizing job-sear
 
 - Add a job from a manually entered URL.
 - Best-effort metadata fetching for job title, company, and description when the job page allows local browser reads.
-- Browser extension capture across LinkedIn, Glassdoor, and job pages that expose standard job metadata.
+- Browser extension capture across LinkedIn, Glassdoor, and job pages that expose standard job metadata, with an optional job-specific note added during capture.
 - Paste-and-parse fallback for blocked job pages.
 - Application XP, levels, progress meter, and title ranks.
 - 50 account-level achievements with XP rewards, popup unlocks, icons, and JSON persistence.
@@ -115,7 +115,7 @@ To install it locally:
 3. Choose **Load unpacked**.
 4. Select the `extension/` folder.
 
-On a recognized job page, choose whether the job should start as **Applied** or **Saved**, then click **Add to HireLevel**. If the widget does not appear automatically, open the extension and choose **Show capture widget on this page**. If the extension knows about multiple boards, it will also ask which board to use. If it only knows one board, it captures directly for that board. Saved captures do not grant XP. Applied captures grant the normal 5 XP once. If the tracker has not been opened yet, the extension queues the job and the tracker imports it when opened.
+On a recognized job page, choose whether the job should start as **Applied** or **Saved**, optionally add a job-specific note, then click **Add to HireLevel**. If the widget does not appear automatically, open the extension and choose **Show capture widget on this page**. If the extension knows about multiple boards, it will also ask which board to use. If it only knows one board, it captures directly for that board. Saved captures do not grant XP. Applied captures grant the normal 5 XP once. If the tracker has not been opened yet, the extension queues the job and the tracker imports it when opened.
 
 Dedicated capture logic is included for:
 
