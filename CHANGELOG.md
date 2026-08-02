@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.3.0 - 2026-08-02
+
+- Replaced all 50 achievement placeholders with unique illustrated icons.
+- Matched icon frames and visual effects to common, uncommon, rare, legendary, and mythical achievement tiers.
+- Optimized every achievement icon for the gallery and achievement-unlock popup.
+
 ## v2.2.0 - 2026-07-28
 
 - Added an optional job-specific note field to LinkedIn, Glassdoor, and generic capture widgets.
