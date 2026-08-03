@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.3.1 - 2026-08-03
+
+- Corrected the crop and alignment of all 50 achievement icons using their individual frame boundaries.
+- Removed neighboring tile fragments from achievement icons and standardized their visible padding.
+
 ## v2.3.0 - 2026-08-02
 
 - Replaced all 50 achievement placeholders with unique illustrated icons.
