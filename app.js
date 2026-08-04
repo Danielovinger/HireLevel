@@ -5,6 +5,9 @@ const DATA_FILE_STORE_NAME = "handles";
 const DATA_FILE_HANDLE_KEY = "primary";
 const MAX_CUSTOM_COLUMNS = 5;
 const CUSTOM_COLUMN_XP = 25;
+const DRAG_AUTO_SCROLL_EDGE = 96;
+const DRAG_AUTO_SCROLL_MIN_SPEED = 180;
+const DRAG_AUTO_SCROLL_MAX_SPEED = 900;
 
 const defaultColumns = [
   { id: "saved", name: "Saved", type: "default" },
@@ -458,6 +461,11 @@ const achievementDefinitions = [
 let state = loadState();
 let editingJobId = null;
 let draggedJobId = null;
+let dragPointerX = 0;
+let dragPointerY = 0;
+let dragAutoScrollVelocity = 0;
+let dragAutoScrollFrame = null;
+let dragAutoScrollLastTime = 0;
 let pendingConfirmAction = null;
 let achievementPopupQueue = [];
 let currentAchievementPopupId = null;
@@ -518,6 +526,8 @@ document.querySelectorAll("[data-view]").forEach((button) => {
 });
 
 window.addEventListener("message", handleExtensionMessage);
+document.addEventListener("dragover", handleDragAutoScroll);
+document.addEventListener("drop", stopDragAutoScroll);
 
 jobForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -720,8 +730,7 @@ function renderBoard() {
     });
     cardsElement.addEventListener("drop", () => {
       const beforeJobId = cardsElement.querySelector(".drop-before")?.dataset.jobId || null;
-      columnElement.classList.remove("drag-over");
-      clearDropMarkers();
+      stopDragAutoScroll();
       moveJob(draggedJobId, column.id, beforeJobId);
     });
 
@@ -1113,7 +1122,7 @@ function renderCard(job) {
   card.addEventListener("dragend", () => {
     draggedJobId = null;
     card.classList.remove("dragging");
-    clearDropMarkers();
+    stopDragAutoScroll();
   });
 
   card.querySelector(".notes-input").addEventListener("change", (event) => updateJob(job.id, { notes: event.target.value }));
@@ -1703,6 +1712,87 @@ function getCardDropTarget(cardsElement, pointerY) {
 
 function clearDropMarkers() {
   document.querySelectorAll(".drop-before").forEach((card) => card.classList.remove("drop-before"));
+}
+
+function clamp(value, minimum, maximum) {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function handleDragAutoScroll(event) {
+  if (!draggedJobId) return;
+
+  dragPointerX = event.clientX;
+  dragPointerY = event.clientY;
+  const boardRect = board.getBoundingClientRect();
+  const topEdge = Math.max(boardRect.top, 0);
+  const bottomEdge = Math.min(boardRect.bottom, window.innerHeight);
+
+  if (event.clientX < boardRect.left || event.clientX > boardRect.right) {
+    setDragAutoScrollVelocity(0);
+    return;
+  }
+
+  if (event.clientY >= bottomEdge - DRAG_AUTO_SCROLL_EDGE) {
+    const strength = clamp((event.clientY - (bottomEdge - DRAG_AUTO_SCROLL_EDGE)) / DRAG_AUTO_SCROLL_EDGE, 0, 1);
+    setDragAutoScrollVelocity(DRAG_AUTO_SCROLL_MIN_SPEED + strength * (DRAG_AUTO_SCROLL_MAX_SPEED - DRAG_AUTO_SCROLL_MIN_SPEED));
+    return;
+  }
+
+  if (event.clientY <= topEdge + DRAG_AUTO_SCROLL_EDGE) {
+    const strength = clamp((topEdge + DRAG_AUTO_SCROLL_EDGE - event.clientY) / DRAG_AUTO_SCROLL_EDGE, 0, 1);
+    setDragAutoScrollVelocity(-(DRAG_AUTO_SCROLL_MIN_SPEED + strength * (DRAG_AUTO_SCROLL_MAX_SPEED - DRAG_AUTO_SCROLL_MIN_SPEED)));
+    return;
+  }
+
+  setDragAutoScrollVelocity(0);
+}
+
+function setDragAutoScrollVelocity(velocity) {
+  dragAutoScrollVelocity = velocity;
+  if (velocity === 0) {
+    if (dragAutoScrollFrame !== null) cancelAnimationFrame(dragAutoScrollFrame);
+    dragAutoScrollFrame = null;
+    dragAutoScrollLastTime = 0;
+    return;
+  }
+
+  if (dragAutoScrollFrame !== null) return;
+  dragAutoScrollLastTime = performance.now();
+  dragAutoScrollFrame = requestAnimationFrame(runDragAutoScroll);
+}
+
+function runDragAutoScroll(timestamp) {
+  if (!draggedJobId || dragAutoScrollVelocity === 0) {
+    dragAutoScrollFrame = null;
+    dragAutoScrollLastTime = 0;
+    return;
+  }
+
+  const elapsedSeconds = Math.min(timestamp - dragAutoScrollLastTime, 32) / 1000;
+  dragAutoScrollLastTime = timestamp;
+  board.scrollTop += dragAutoScrollVelocity * elapsedSeconds;
+  updateDropMarkerAtPointer();
+  dragAutoScrollFrame = requestAnimationFrame(runDragAutoScroll);
+}
+
+function updateDropMarkerAtPointer() {
+  const pointerElement = document.elementFromPoint(dragPointerX, dragPointerY);
+  const cardsElement = pointerElement?.closest(".cards");
+  if (!cardsElement || !board.contains(cardsElement)) return;
+
+  board.querySelectorAll(".column.drag-over").forEach((column) => column.classList.remove("drag-over"));
+  clearDropMarkers();
+  cardsElement.closest(".column")?.classList.add("drag-over");
+  getCardDropTarget(cardsElement, dragPointerY)?.classList.add("drop-before");
+}
+
+function stopDragAutoScroll() {
+  dragAutoScrollVelocity = 0;
+  if (dragAutoScrollFrame !== null) cancelAnimationFrame(dragAutoScrollFrame);
+  dragAutoScrollFrame = null;
+  dragAutoScrollLastTime = 0;
+  board.querySelectorAll(".column.drag-over").forEach((column) => column.classList.remove("drag-over"));
+  clearDropMarkers();
 }
 
 function updateJob(jobId, patch) {

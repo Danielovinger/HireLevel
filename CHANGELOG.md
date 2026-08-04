@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.4.0 - 2026-08-04
+
+- Added automatic vertical board scrolling while dragging a job near the top or bottom edge.
+- Varied scrolling speed by pointer proximity for controlled movement through long columns.
+- Kept the destination column and insertion marker updated while the board scrolls.
+
 ## v2.3.1 - 2026-08-03
 
 - Corrected the crop and alignment of all 50 achievement icons using their individual frame boundaries.
