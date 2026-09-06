@@ -13,6 +13,7 @@ HireLevel is a small offline-first job application board for organizing job-sear
 - Application XP, levels, progress meter, and title ranks.
 - 50 account-level achievements with XP rewards, popup unlocks, icons, and JSON persistence.
 - Multiple job-search boards.
+- A Statistics page for each board: application conversions, custom-stage comparisons, current/ever stage counts, top companies and positions, weekly activity, and response timing.
 - Global account XP or separate XP per board.
 - Board and progression reset controls with confirmation prompts.
 - Kanban-style columns for Saved, Applied, First Positive Answer, Interviewing, Offer, and Reject.
@@ -70,7 +71,17 @@ The Settings tab lets you choose whether XP is shown as:
 
 The current board can be reset to its default state without resetting XP. Board progression can also be reset separately. Account progression reset is only available from Settings.
 
-## Use HireLevel
+## Statistics
+
+Open **Statistics** in the sidebar, then select the board to explore. The page counts jobs still on that board across all time, independently of the board search box and XP mode.
+
+The application journey shows how many Applied jobs were later recorded at First Positive Answer, Interviewing, Offer, and Reject. Each job counts once per milestone, even after repeated moves. Main percentages use all known Applied jobs; the smaller percentages compare consecutive stages within that Applied group. Skipped stages are never inferred.
+
+Use **Stage explorer** to compare any two columns, including custom columns. The stage table shows jobs in a stage now and jobs ever recorded there. Identifiable removed custom stages remain available. Custom stages are not automatically classified as successful or unsuccessful outcomes.
+
+Company and exact position-title rankings can show Applied jobs or all tracked jobs. Weekly activity covers 12 Monday-based UTC weeks using the first recorded application date, falling back to the entered date only when Applied membership is known. Response timing uses dated stage events. Older incomplete histories still contribute known stage counts but may not prove a conversion or timing. Expand **How these numbers work** for details.
+
+## Download and launch
 
 For non-technical users, download `HireLevel-windows.zip` from the latest GitHub Release. It contains:
 
@@ -78,6 +89,9 @@ For non-technical users, download `HireLevel-windows.zip` from the latest GitHub
 HireLevel.html
 app.js
 styles.css
+statistics.js
+statistics-view.js
+statistics.css
 extension/
 windows-release-readme.txt
 ```
@@ -141,6 +155,12 @@ Tracker data is saved locally. By default, HireLevel uses browser storage. In Ch
 - CSV export.
 - Reminders and follow-up dates.
 - Archive view.
+
+## Development and releases
+
+Run `node --test tests/*.test.js` for statistics and event-persistence checks. The app has no runtime package dependencies.
+
+See [the release workflow](docs/releasing.md) for packaging, GitHub publication, and the saved rule to update the live Desktop installation while preserving `HireLevel-data.json`.
 
 ## Acknowledgments
 

@@ -500,6 +500,7 @@ document.querySelector("#importInput").addEventListener("change", importState);
 document.querySelector("#fetchJobBtn").addEventListener("click", fetchJobDetails);
 document.querySelector("#parsePastedTextBtn").addEventListener("click", parsePastedText);
 document.querySelector("#boardSelect").addEventListener("change", changeActiveBoard);
+document.querySelector("#statisticsBoardSelect").addEventListener("change", changeActiveBoard);
 document.querySelector("#xpModeSelect").addEventListener("change", changeXpMode);
 document.querySelector("#themeModeSelect").addEventListener("change", changeThemeMode);
 document.querySelector("#colorSchemeSelect").addEventListener("change", changeColorScheme);
@@ -554,12 +555,12 @@ jobForm.addEventListener("submit", (event) => {
   if (editingJobId) {
     board.jobs = board.jobs.map((existing) => (existing.id === editingJobId ? job : existing));
     if (existingJob?.status !== job.status) {
-      addJobTimelineEvent(board, job.id, "status", `Moved to ${getColumnName(board, job.status)}`, `From ${getColumnName(board, existingJob.status)}.`);
+      addJobTimelineEvent(board, job.id, "status", `Moved to ${getColumnName(board, job.status)}`, `From ${getColumnName(board, existingJob.status)}.`, stageEventMetadata(board, job.status, existingJob.status));
     } else {
       addJobTimelineEvent(board, job.id, "edited", "Job details edited");
     }
   } else {
-    addJobTimelineEventToJob(job, "created", `Added to ${getColumnName(board, job.status)}`, "Created manually in HireLevel.");
+    addJobTimelineEventToJob(job, "created", `Added to ${getColumnName(board, job.status)}`, "Created manually in HireLevel.", stageEventMetadata(board, job.status));
     board.jobs.push(job);
   }
 
@@ -668,7 +669,7 @@ function migrateState(parsed) {
   legacyBoard.jobs.forEach((job) => {
     if (job.status && job.status !== "saved") {
       const xp = getColumnXp(legacyBoard, job.status);
-      if (xp > 0) migrated.xpEvents.push(createXpEvent(legacyBoard.id, job.id, job.status, xp));
+      if (xp > 0) migrated.xpEvents.push({ ...createXpEvent(legacyBoard.id, job.id, job.status, xp), earnedAt: "" });
     }
   });
   return migrated;
@@ -693,7 +694,14 @@ function renderApp() {
   renderAchievements();
   renderLevelPanel();
   renderBoard();
+  renderStatistics();
   syncExtensionBoardList();
+}
+
+function renderStatistics() {
+  if (!document.querySelector("#statisticsView").hidden) {
+    HireLevelStatisticsView.render(getActiveBoard(), state.boards, state.xpEvents);
+  }
 }
 
 function renderBoard() {
@@ -1214,7 +1222,11 @@ function switchView(viewId) {
   });
   document.querySelectorAll("[data-view]").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === viewId);
+    if (button.dataset.view === viewId) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
   });
+  document.querySelector(".search").hidden = viewId !== "boardView";
+  renderStatistics();
 }
 
 function changeActiveBoard(event) {
@@ -1440,7 +1452,8 @@ function normalizeCapturedJob(rawJob) {
       createTimelineEvent(
         "created",
         `Captured to ${status === "saved" ? "Saved" : "Applied"}`,
-        source ? `Captured from ${source}.` : "Captured from browser extension."
+        source ? `Captured from ${source}.` : "Captured from browser extension.",
+        { columnId: status, columnName: status === "saved" ? "Saved" : "Applied" }
       ),
     ],
     contacts: [],
@@ -1684,7 +1697,7 @@ function moveJob(jobId, status, beforeJobId = null) {
   const movedJob = { ...job, status };
   ensureJobCollections(movedJob);
   if (previousStatus !== status) {
-    addJobTimelineEventToJob(movedJob, "status", `Moved to ${getColumnName(board, status)}`, `From ${getColumnName(board, previousStatus)}.`);
+    addJobTimelineEventToJob(movedJob, "status", `Moved to ${getColumnName(board, status)}`, `From ${getColumnName(board, previousStatus)}.`, stageEventMetadata(board, status, previousStatus));
   }
   const beforeIndex = beforeJobId ? board.jobs.findIndex((item) => item.id === beforeJobId) : -1;
   const insertIndex = beforeIndex >= 0 ? beforeIndex : getAppendIndexForStatus(board.jobs, status);
@@ -1875,7 +1888,7 @@ function awardXpForColumn(boardId, jobId, columnId) {
   if (alreadyEarned) return 0;
   const previousLevel = calculateLevel(calculateVisibleXp()).level;
   state.xpEvents.push(createXpEvent(boardId, jobId, columnId, xp));
-  addJobTimelineEvent(board, jobId, "xp", `Earned ${formatNumber(xp)} XP`, getColumnName(board, columnId));
+  addJobTimelineEvent(board, jobId, "xp", `Earned ${formatNumber(xp)} XP`, getColumnName(board, columnId), stageEventMetadata(board, columnId));
   const nextLevel = calculateLevel(calculateVisibleXp()).level;
   if (nextLevel > previousLevel) showLevelUpConfetti(nextLevel - previousLevel);
   return xp;
@@ -2119,7 +2132,11 @@ function normalizeTimeline(timeline) {
           type: cleanText(event.type) || "note",
           title: cleanText(event.title),
           details: cleanText(event.details),
-          at: event.at || new Date().toISOString(),
+          at: event.at || "",
+          columnId: cleanText(event.columnId),
+          columnName: cleanText(event.columnName),
+          fromColumnId: cleanText(event.fromColumnId),
+          fromColumnName: cleanText(event.fromColumnName),
         }))
     : [];
 }
@@ -2139,19 +2156,23 @@ function normalizeContacts(contacts) {
     : [];
 }
 
-function createTimelineEvent(type, title, details = "") {
-  return { id: createId(), type, title, details, at: new Date().toISOString() };
+function stageEventMetadata(board, columnId, fromColumnId = "") {
+  return { columnId, columnName: getColumnName(board, columnId), fromColumnId, fromColumnName: fromColumnId ? getColumnName(board, fromColumnId) : "" };
 }
 
-function addJobTimelineEvent(board, jobId, type, title, details = "") {
+function createTimelineEvent(type, title, details = "", metadata = {}) {
+  return { id: createId(), type, title, details, at: new Date().toISOString(), ...metadata };
+}
+
+function addJobTimelineEvent(board, jobId, type, title, details = "", metadata = {}) {
   const job = board.jobs.find((item) => item.id === jobId);
   if (!job) return;
-  addJobTimelineEventToJob(job, type, title, details);
+  addJobTimelineEventToJob(job, type, title, details, metadata);
 }
 
-function addJobTimelineEventToJob(job, type, title, details = "") {
+function addJobTimelineEventToJob(job, type, title, details = "", metadata = {}) {
   ensureJobCollections(job);
-  job.timeline.push(createTimelineEvent(type, title, details));
+  job.timeline.push(createTimelineEvent(type, title, details, metadata));
 }
 
 function createXpEvent(boardId, jobId, columnId, xp) {
@@ -2421,6 +2442,7 @@ function formatDate(date) {
 
 function formatDateTime(value) {
   if (!value) return "No date";
+  if (!Number.isFinite(new Date(value).getTime())) return "Unknown date";
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",

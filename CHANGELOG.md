@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.5.0 - 2026-09-06
+
+- Added a themed Statistics page with board selection, application-to-response/interview/offer/reject conversions, and unique-job counts.
+- Added a stage explorer for any default or custom column pair and current/ever counts, retaining identifiable removed-stage history.
+- Added company and position rankings for applied or all tracked jobs, 12-week application activity, median response time, and search trivia.
+- Preserved stable stage IDs and names in new timeline events; older ambiguous or undated history stays unknown rather than inventing conversions.
+- Kept Statistics navigation available on small screens and added accessible charts, empty states, and counting explanations.
+- Documented the release workflow and added a verified Desktop updater that preserves local JSON data.
+
 ## v2.4.0 - 2026-08-04
 
 - Added automatic vertical board scrolling while dragging a job near the top or bottom edge.

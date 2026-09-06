@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>HireLevel</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="statistics.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -18,6 +19,7 @@
         </div>
         <nav>
           <button class="nav-link active" type="button" data-view="boardView">Application Board</button>
+          <button class="nav-link" type="button" data-view="statisticsView">Statistics</button>
           <button class="nav-link" type="button" data-view="achievementsView">Achievements</button>
           <button class="nav-link" type="button" data-view="settingsView">Settings</button>
         </nav>
@@ -70,6 +72,71 @@
           </section>
 
           <section id="board" class="board" aria-label="Job application board"></section>
+        </section>
+
+        <section id="statisticsView" class="view statistics-view" aria-labelledby="statisticsTitle" hidden>
+          <div class="stats-heading">
+            <div>
+              <p class="eyebrow">Your search, in perspective</p>
+              <h2 id="statisticsTitle">The bigger picture</h2>
+              <p class="stats-caption">Every application has a story. Here’s what your board is telling you.</p>
+            </div>
+            <div class="stats-controls">
+              <label for="statisticsBoardSelect">Board to explore</label>
+              <select id="statisticsBoardSelect"></select>
+            </div>
+          </div>
+          <section class="stats-hero">
+            <div class="stats-hero-copy">
+              <p class="eyebrow">Search quest · Statistics</p>
+              <h3>Small steps. Bigger possibilities.</h3>
+              <p id="statsHeroSummary"></p>
+            </div>
+            <div class="stats-hero-art" aria-hidden="true"><div class="stats-orbit"><span>↗</span></div><div class="stats-spark"><span></span><span></span><span></span><span></span><span></span></div></div>
+          </section>
+          <div id="statsEmpty" class="stats-empty" hidden>Add your first job to this board and your search story will start here.</div>
+          <div id="statsKpis" class="stats-kpis"></div>
+          <div class="stats-grid">
+            <section class="stats-panel stats-panel-wide">
+              <div class="stats-panel-heading"><div><p class="eyebrow">From sent to celebrated</p><h3>Your application journey</h3></div><p>Unique jobs recorded at each milestone after Applied.</p></div>
+              <div id="statsJourney" class="stats-journey"></div>
+              <div id="statsRejection" class="stats-rejection"></div>
+              <p class="stats-caption">Milestone percentages use all Applied jobs; the smaller percentages compare the previous stage within that group. Jobs can skip stages or reach several milestones, so counts do not add up to a total.</p>
+            </section>
+            <section class="stats-panel">
+              <div class="stats-panel-heading"><div><p class="eyebrow">Choose your own path</p><h3>Stage explorer</h3></div></div>
+              <p class="stats-caption">Compare any two stages, including your custom columns. You decide what progress means.</p>
+              <div class="stats-transition-controls">
+                <label>From<select id="statsFromStage"></select></label><span class="stats-arrow" aria-hidden="true">→</span><label>To<select id="statsToStage"></select></label>
+              </div>
+              <div id="statsTransition" class="stats-transition-result" aria-live="polite"></div>
+            </section>
+            <section class="stats-panel">
+              <div class="stats-panel-heading"><div><p class="eyebrow">The whole board counts</p><h3>Every stage, every detour</h3></div></div>
+              <div class="stats-stage-table"><table><caption class="sr-only">Jobs currently in and ever recorded in each stage</caption><thead><tr><th scope="col">Stage</th><th scope="col">Now</th><th scope="col">Ever</th></tr></thead><tbody id="statsStageRows"></tbody></table></div>
+              <p class="stats-caption">“Ever” counts each job once per stage, even after it moves on. Custom and removed stages keep their own identity.</p>
+            </section>
+            <section class="stats-panel stats-panel-wide">
+              <div class="stats-panel-heading"><div><p class="eyebrow">One application at a time</p><h3>Your last 12 weeks</h3></div><p id="statsActivitySummary"></p></div>
+              <div id="statsActivity" class="stats-activity" role="list" aria-label="Applications by week"></div>
+              <p id="statsActivityNote" class="stats-caption"></p>
+            </section>
+            <section class="stats-panel stats-panel-wide">
+              <div class="stats-panel-heading"><div><p class="eyebrow">Familiar names & favorite roles</p><h3>Where your search takes you</h3></div><label class="stats-inline-controls">Show<select id="statsRankingScope"><option value="applied">Applied jobs</option><option value="tracked">All tracked jobs</option></select></label></div>
+              <div class="stats-grid"><div><h4>Most popular companies</h4><ol id="statsCompanies" class="stats-rank-list"></ol></div><div><h4>Most popular positions</h4><ol id="statsPositions" class="stats-rank-list"></ol></div></div>
+              <p class="stats-caption">Top five by job count. Matching names ignore capitalization and extra spaces; different position titles stay separate.</p>
+            </section>
+            <section class="stats-panel stats-panel-wide">
+              <div class="stats-panel-heading"><div><p class="eyebrow">A little search trivia</p><h3>Side quests & signals</h3></div></div>
+              <div id="statsFacts" class="stats-facts"></div>
+            </section>
+          </div>
+          <details class="stats-notes"><summary>How these numbers work</summary>
+            <p>Statistics cover jobs still on the selected board, across all time, regardless of the board search box or XP mode. Deleted jobs are excluded. Moving a job back and forth never adds another job to a count.</p>
+            <p>Stage visits come from the job timeline, recorded XP events, and its current column. A conversion requires evidence that the destination came after the starting stage. Skipped stages are not filled in. Custom columns are never automatically classified as a response, interview, offer, or rejection.</p>
+            <p>Older jobs can have incomplete history. They still count in their known stages, but an undated or ambiguous visit may not establish a conversion. Weekly activity uses the first dated Applied record, with the entered application date as a fallback only for jobs known to have reached Applied. Response time uses dated stage records.</p>
+            <p id="statsCoverage"></p>
+          </details>
         </section>
 
         <section id="settingsView" class="view settings-view" hidden>
@@ -366,6 +433,8 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
+    <script src="statistics.js"></script>
+    <script src="statistics-view.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

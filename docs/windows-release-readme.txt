@@ -9,6 +9,7 @@ Included files:
 - HireLevel.html
 - app.js
 - styles.css
+- statistics.js, statistics-view.js, statistics.css
 - extension/
 - windows-release-readme.txt
 
@@ -16,6 +17,13 @@ Start the app:
 
 1. Double-click HireLevel.html.
 2. Your browser will open the HireLevel app.
+
+Explore your progress:
+
+Choose Statistics in the navigation. Select a board to see application conversions,
+compare any two default or custom stages, explore top companies and positions,
+and see application activity and response timing. Counts use jobs still on that
+board. Expand How these numbers work for the rules and older-history limitations.
 
 Please Notice:
 
